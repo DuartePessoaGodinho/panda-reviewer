@@ -6,6 +6,7 @@ export default defineConfig({
   plugins: [vue()],
   root: 'src/renderer',
   base: './',
+  publicDir: resolve(__dirname, 'assets'),
   build: {
     outDir: resolve(__dirname, 'dist/renderer'),
     emptyOutDir: true,
