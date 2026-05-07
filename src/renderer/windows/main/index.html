@@ -196,6 +196,7 @@
       transition: background 0.1s, color 0.1s;
     }
     .settings-btn:hover { background: var(--surface2); color: var(--text); }
+    .settings-btn.active { background: var(--surface2); color: var(--text); font-weight: 600; }
 
     /* ── Sidebar collapse ── */
     .sidebar { transition: width 0.18s ease; }
@@ -228,15 +229,104 @@
     /* ── Panel ── */
     .panel { flex: 1; overflow: hidden; display: flex; flex-direction: column; min-height: 0; }
     .split { display: flex; flex: 1; overflow: hidden; min-height: 0; }
+    .split.hidden { display: none; }
+
+    .settings-screen {
+      flex: 1;
+      min-height: 0;
+      overflow: hidden;
+      display: flex;
+      background: var(--bg);
+    }
+    .settings-screen.hidden { display: none; }
+    .settings-frame {
+      width: 100%;
+      height: 100%;
+      border: 0;
+      background: var(--bg);
+    }
+
+    /* ── MR Panel (list + filter bar) ── */
+    .mr-panel {
+      width: 360px;
+      flex-shrink: 0;
+      display: flex;
+      flex-direction: column;
+      border-right: 1px solid var(--border);
+      overflow: hidden;
+    }
+
+    /* ── Filter bar ── */
+    .filter-bar {
+      padding: 7px 10px 6px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+      flex-shrink: 0;
+      background: var(--surface);
+    }
+    .filter-bar:empty { display: none; }
+    .fb-row {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      flex-wrap: nowrap;
+    }
+    .fb-group { display: flex; gap: 2px; }
+    .fb-pill {
+      font-size: 10px;
+      font-weight: 600;
+      padding: 3px 8px;
+      border-radius: 5px;
+      border: 1px solid var(--border2);
+      background: transparent;
+      color: var(--text3);
+      cursor: pointer;
+      transition: background 0.1s, color 0.1s, border-color 0.1s;
+      white-space: nowrap;
+      line-height: 1.4;
+    }
+    .fb-pill:hover { background: var(--surface2); color: var(--text2); }
+    .fb-pill.active { background: var(--accent-bg); border-color: var(--accent-border); color: #58a6ff; }
+    .fb-pill.toggle.active { background: rgba(252,109,38,0.1); border-color: rgba(252,109,38,0.35); color: var(--orange); }
+    .fb-pill.toggle-draft.active { background: rgba(139,148,158,0.12); border-color: rgba(139,148,158,0.3); color: var(--text2); }
+    .fb-select {
+      font-size: 10px;
+      padding: 3px 6px;
+      border-radius: 5px;
+      border: 1px solid var(--border2);
+      background: var(--surface2);
+      color: var(--text2);
+      cursor: pointer;
+      outline: none;
+      flex: 1;
+      min-width: 0;
+      max-width: 130px;
+    }
+    .fb-select:focus { border-color: var(--accent-border); }
+    .fb-select option { background: var(--surface2); }
+    .fb-clear {
+      margin-left: auto;
+      font-size: 10px;
+      padding: 2px 7px;
+      border-radius: 5px;
+      border: 1px solid transparent;
+      background: transparent;
+      color: var(--accent);
+      cursor: pointer;
+      white-space: nowrap;
+      transition: background 0.1s;
+      flex-shrink: 0;
+    }
+    .fb-clear:hover { background: var(--accent-bg); }
 
     /* ── MR List ── */
     .mr-list {
-      width: 360px;
-      flex-shrink: 0;
+      flex: 1;
       overflow-y: auto;
       scrollbar-gutter: stable;
       padding: 10px;
-      border-right: 1px solid var(--border);
     }
 
     /* ── MR Card ── */
@@ -1476,17 +1566,20 @@
     </div>
 
     <div class="panel">
-      <div class="split">
-        <div class="mr-list" id="mrList">
-          <div class="skeleton-card">
-            <div class="skeleton sk-line" style="width:40%"></div>
-            <div class="skeleton sk-title"></div>
-            <div class="skeleton sk-sub"></div>
-          </div>
-          <div class="skeleton-card">
-            <div class="skeleton sk-line" style="width:35%"></div>
-            <div class="skeleton sk-title" style="width:75%"></div>
-            <div class="skeleton sk-sub" style="width:45%"></div>
+      <div class="split" id="reviewScreen">
+        <div class="mr-panel">
+          <div class="filter-bar" id="filterBar"></div>
+          <div class="mr-list" id="mrList">
+            <div class="skeleton-card">
+              <div class="skeleton sk-line" style="width:40%"></div>
+              <div class="skeleton sk-title"></div>
+              <div class="skeleton sk-sub"></div>
+            </div>
+            <div class="skeleton-card">
+              <div class="skeleton sk-line" style="width:35%"></div>
+              <div class="skeleton sk-title" style="width:75%"></div>
+              <div class="skeleton sk-sub" style="width:45%"></div>
+            </div>
           </div>
         </div>
         <div class="diff-panel" id="diffPanel">
@@ -1496,6 +1589,9 @@
             <p>Click an MR card or "AI Review"<br>to get started.</p>
           </div>
         </div>
+      </div>
+      <div class="settings-screen hidden" id="settingsScreen">
+        <iframe class="settings-frame" id="settingsFrame" title="Settings"></iframe>
       </div>
     </div>
   </div>

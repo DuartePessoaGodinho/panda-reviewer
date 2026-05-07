@@ -302,6 +302,27 @@ function updateCounts() {
 function findMrById(id) {
     return [...toReviewMrs, ...myMrs].find(m => m.id === id) ?? null;
 }
+// ── App-level views ───────────────────────────────────────────────────────
+function updateSidebarSelection() {
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.tab === activeTab);
+    });
+}
+function showReviewScreen() {
+    document.getElementById('reviewScreen').classList.remove('hidden');
+    document.getElementById('settingsScreen').classList.add('hidden');
+    document.getElementById('settingsBtn').classList.remove('active');
+    updateSidebarSelection();
+}
+function showSettingsScreen() {
+    const frame = document.getElementById('settingsFrame');
+    if (!frame.src)
+        frame.src = '../settings/index.html?embedded=1';
+    document.getElementById('reviewScreen').classList.add('hidden');
+    document.getElementById('settingsScreen').classList.remove('hidden');
+    document.getElementById('settingsBtn').classList.add('active');
+    document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+}
 // ── Panel tab bar ──────────────────────────────────────────────────────────
 function renderPanelTabs(mr) {
     const isRunningHere = aiRunning && reviewingMr?.id === mr.id;
@@ -768,7 +789,7 @@ function showCloneDialog(repoUrl) {
 document.querySelectorAll('.tab-btn').forEach(btn => {
     btn.addEventListener('click', () => {
         activeTab = btn.dataset.tab;
-        document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b === btn));
+        showReviewScreen();
         activeMr = null;
         rawOutput = '';
         aiRunning = false;
@@ -781,7 +802,12 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
         renderList();
     });
 });
-document.getElementById('settingsBtn').addEventListener('click', () => window.api.openSettings());
+document.getElementById('settingsBtn').addEventListener('click', () => showSettingsScreen());
+window.addEventListener('message', (event) => {
+    if (event.data?.type === 'settings-close')
+        showReviewScreen();
+});
+window.api.onShowSettings(() => showSettingsScreen());
 document.getElementById('refreshBtn').addEventListener('click', async () => {
     const btn = document.getElementById('refreshBtn');
     btn.classList.add('spinning');

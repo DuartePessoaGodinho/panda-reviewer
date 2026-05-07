@@ -17,6 +17,14 @@ let rawOutput = '';
 let currentUserId: number | null = null;
 const locallyApproved = new Set<number>(); // mr.id — approved in this session, survives poll refreshes
 
+// ── Filter state ───────────────────────────────────────────────────────────
+
+type ApprovalFilter = 'all' | 'pending' | 'approved';
+let filterApproval: ApprovalFilter = 'all';
+let filterNoComments = false;
+let filterHideDrafts = false;
+let filterAuthor = 'all';
+
 // AI review history state
 type AiView = 'history' | 'new' | 'running' | 'reading';
 let aiView: AiView = 'history';
@@ -95,6 +103,96 @@ function escapeAttr(value: string): string {
     .replace(/"/g, '&quot;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;');
+}
+
+function resetFilters(): void {
+  filterApproval = 'all';
+  filterNoComments = false;
+  filterHideDrafts = false;
+  filterAuthor = 'all';
+}
+
+function isAnyFilterActive(): boolean {
+  return filterApproval !== 'all' || filterNoComments || filterHideDrafts || filterAuthor !== 'all';
+}
+
+function filteredMrs(): MR[] {
+  const mrs = activeTab === 'review' ? toReviewMrs : myMrs;
+  return mrs.filter(mr => {
+    if (filterApproval === 'pending' && approvedByMe(mr)) return false;
+    if (filterApproval === 'approved' && !approvedByMe(mr)) return false;
+    if (filterNoComments && mr.user_notes_count > 0) return false;
+    if (filterHideDrafts && isDraft(mr)) return false;
+    if (filterAuthor !== 'all' && mr.author.username !== filterAuthor) return false;
+    return true;
+  });
+}
+
+function renderFilterBar(): void {
+  const bar = document.getElementById('filterBar');
+  if (!bar) return;
+  const allMrs = activeTab === 'review' ? toReviewMrs : myMrs;
+  if (allMrs.length === 0) { bar.innerHTML = ''; return; }
+
+  const authors = [...new Map(allMrs.map(m => [m.author.username, m.author])).values()]
+    .sort((a: any, b: any) => a.name.localeCompare(b.name));
+
+  const authorOptions = [
+    '<option value="all">All authors</option>',
+    ...authors.map((a: any) =>
+      `<option value="${escapeAttr(a.username)}" ${filterAuthor === a.username ? 'selected' : ''}>${escapeAttr(a.name)}</option>`
+    ),
+  ].join('');
+
+  const hasActive = isAnyFilterActive();
+
+  bar.innerHTML = `
+    <div class="fb-row">
+      <div class="fb-group">
+        <button class="fb-pill ${filterApproval === 'all' ? 'active' : ''}" data-value="all">All</button>
+        <button class="fb-pill ${filterApproval === 'pending' ? 'active' : ''}" data-value="pending">Pending</button>
+        <button class="fb-pill ${filterApproval === 'approved' ? 'active' : ''}" data-value="approved">Approved</button>
+      </div>
+      <select class="fb-select" id="fbAuthorSelect">${authorOptions}</select>
+    </div>
+    <div class="fb-row">
+      <button class="fb-pill toggle ${filterNoComments ? 'active' : ''}" id="fbNoComments">No comments</button>
+      <button class="fb-pill toggle-draft ${filterHideDrafts ? 'active' : ''}" id="fbHideDrafts">Hide drafts</button>
+      ${hasActive ? '<button class="fb-clear" id="fbClear">Clear</button>' : ''}
+    </div>
+  `;
+
+  bar.querySelectorAll<HTMLElement>('.fb-group .fb-pill').forEach(btn => {
+    btn.addEventListener('click', () => {
+      filterApproval = btn.dataset.value as ApprovalFilter;
+      renderFilterBar();
+      renderList();
+    });
+  });
+
+  bar.querySelector('#fbAuthorSelect')?.addEventListener('change', (e) => {
+    filterAuthor = (e.target as HTMLSelectElement).value;
+    renderFilterBar();
+    renderList();
+  });
+
+  bar.querySelector('#fbNoComments')?.addEventListener('click', () => {
+    filterNoComments = !filterNoComments;
+    renderFilterBar();
+    renderList();
+  });
+
+  bar.querySelector('#fbHideDrafts')?.addEventListener('click', () => {
+    filterHideDrafts = !filterHideDrafts;
+    renderFilterBar();
+    renderList();
+  });
+
+  bar.querySelector('#fbClear')?.addEventListener('click', () => {
+    resetFilters();
+    renderFilterBar();
+    renderList();
+  });
 }
 
 function aiProviderLabel(): string {
@@ -224,17 +322,21 @@ async function openDiffForMr(mr: MR): Promise<void> {
 
 function renderList(): void {
   const list = document.getElementById('mrList')!;
-  const mrs = activeTab === 'review' ? toReviewMrs : myMrs;
+  const mrs = filteredMrs();
   list.classList.toggle('animate-cards', firstLoad);
 
   if (mrs.length === 0) {
+    const rawMrs = activeTab === 'review' ? toReviewMrs : myMrs;
+    const filtered = isAnyFilterActive() && rawMrs.length > 0;
     list.innerHTML = `
       <div class="empty-state">
-        <div class="empty-icon">${activeTab === 'review' ? '✅' : '📭'}</div>
-        <div class="empty-title">${activeTab === 'review' ? 'Nothing to review' : 'No open MRs'}</div>
-        <div class="empty-sub">${activeTab === 'review'
-          ? "You're all caught up.<br>No MRs are waiting for your review."
-          : 'You have no open merge requests right now.'}</div>
+        <div class="empty-icon">${filtered ? '🔍' : (activeTab === 'review' ? '✅' : '📭')}</div>
+        <div class="empty-title">${filtered ? 'No matches' : (activeTab === 'review' ? 'Nothing to review' : 'No open MRs')}</div>
+        <div class="empty-sub">${filtered
+          ? 'No MRs match your current filters.<br>Try relaxing or clearing them.'
+          : (activeTab === 'review'
+            ? "You're all caught up.<br>No MRs are waiting for your review."
+            : 'You have no open merge requests right now.')}</div>
       </div>`;
     return;
   }
@@ -321,8 +423,37 @@ function updateCounts(): void {
   mc.className = `tab-count ${myMrs.length === 0 ? 'zero' : ''}`;
 }
 
+function updateList(): void {
+  renderFilterBar();
+  renderList();
+}
+
 function findMrById(id: number): MR | null {
   return [...toReviewMrs, ...myMrs].find(m => m.id === id) ?? null;
+}
+
+// ── App-level views ───────────────────────────────────────────────────────
+
+function updateSidebarSelection(): void {
+  document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.classList.toggle('active', (btn as HTMLElement).dataset.tab === activeTab);
+  });
+}
+
+function showReviewScreen(): void {
+  document.getElementById('reviewScreen')!.classList.remove('hidden');
+  document.getElementById('settingsScreen')!.classList.add('hidden');
+  document.getElementById('settingsBtn')!.classList.remove('active');
+  updateSidebarSelection();
+}
+
+function showSettingsScreen(): void {
+  const frame = document.getElementById('settingsFrame') as HTMLIFrameElement;
+  if (!frame.src) frame.src = '../settings/index.html?embedded=1';
+  document.getElementById('reviewScreen')!.classList.add('hidden');
+  document.getElementById('settingsScreen')!.classList.remove('hidden');
+  document.getElementById('settingsBtn')!.classList.add('active');
+  document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
 }
 
 // ── Panel tab bar ──────────────────────────────────────────────────────────
@@ -822,7 +953,8 @@ function showCloneDialog(repoUrl: string): void {
 document.querySelectorAll('.tab-btn').forEach(btn => {
   btn.addEventListener('click', () => {
     activeTab = (btn as HTMLElement).dataset.tab as 'review' | 'mine';
-    document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b === btn));
+    resetFilters();
+    showReviewScreen();
     activeMr = null;
     rawOutput = '';
     aiRunning = false;
@@ -832,11 +964,17 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
         <strong style="color:var(--text2);font-size:13px;">No MR selected</strong>
         <p>Click an MR card or "AI Review"<br>to get started.</p>
       </div>`;
-    renderList();
+    updateList();
   });
 });
 
-document.getElementById('settingsBtn')!.addEventListener('click', () => window.api.openSettings());
+document.getElementById('settingsBtn')!.addEventListener('click', () => showSettingsScreen());
+
+window.addEventListener('message', (event) => {
+  if (event.data?.type === 'settings-close') showReviewScreen();
+});
+
+window.api.onShowSettings(() => showSettingsScreen());
 
 document.getElementById('refreshBtn')!.addEventListener('click', async () => {
   const btn = document.getElementById('refreshBtn')!;
@@ -880,7 +1018,7 @@ async function init(): Promise<void> {
   if (uid) currentUserId = uid;
   updateCounts();
   await prefetchRepoPaths([...toReview, ...mine]);
-  renderList();
+  updateList();
   firstLoad = false;
 
   const total = toReview.length + mine.length;
@@ -902,7 +1040,7 @@ window.api.onMrsUpdated(async (data: any) => {
   updateCounts();
   if (listChanged) {
     await prefetchRepoPaths([...data.toReview, ...data.myMrs]);
-    renderList();
+    updateList();
   }
 
   const total = data.toReview.length + data.myMrs.length;
@@ -915,7 +1053,7 @@ window.api.onMrsUpdated(async (data: any) => {
 window.api.onSettingsUpdated((settings: any) => {
   aiReviewEnabled = settings.aiReviewEnabled ?? true;
   aiReviewProvider = settings.aiReviewProvider ?? 'claude';
-  renderList();
+  updateList();
   if (activeMr && activePanelTab === 'ai' && !aiRunning) {
     openAiPanel(activeMr);
   }
