@@ -53,7 +53,7 @@
             <div class="poll-dot" :class="pollState"></div>
             <span id="pollText">{{ pollText }}</span>
           </div>
-          <button class="settings-btn" @click="window.api.openSettings()">
+          <button class="settings-btn" :class="{ active: showSettings }" @click="showSettings = !showSettings">
             <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
               <path d="M8 4.754a3.246 3.246 0 1 0 0 6.492 3.246 3.246 0 0 0 0-6.492zM5.754 8a2.246 2.246 0 1 1 4.492 0 2.246 2.246 0 0 1-4.492 0z"/>
               <path d="M9.796 1.343c-.527-1.79-3.065-1.79-3.592 0l-.094.319a.873.873 0 0 1-1.255.52l-.292-.16c-1.64-.892-3.433.902-2.54 2.541l.159.292a.873.873 0 0 1-.52 1.255l-.319.094c-1.79.527-1.79 3.065 0 3.592l.319.094a.873.873 0 0 1 .52 1.255l-.16.292c-.892 1.64.901 3.434 2.541 2.54l.292-.159a.873.873 0 0 1 1.255.52l.094.319c.527 1.79 3.065 1.79 3.592 0l.094-.319a.873.873 0 0 1 1.255-.52l.292.16c1.64.892 3.433-.902 2.54-2.541l-.159-.292a.873.873 0 0 1 .52-1.255l.319-.094c1.79-.527 1.79-3.065 0-3.592l-.319-.094a.873.873 0 0 1-.52-1.255l.16-.292c.892-1.64-.901-3.433-2.541-2.54l-.292.159a.873.873 0 0 1-1.255-.52l-.094-.319zm-2.633.283c.246-.835 1.428-.835 1.674 0l.094.319a1.873 1.873 0 0 0 2.693 1.115l.291-.16c.764-.415 1.6.42 1.184 1.185l-.159.292a1.873 1.873 0 0 0 1.116 2.692l.318.094c.835.246.835 1.428 0 1.674l-.319.094a1.873 1.873 0 0 0-1.115 2.693l.16.291c.415.764-.42 1.6-1.185 1.184l-.291-.159a1.873 1.873 0 0 0-2.693 1.116l-.094.318c-.246.835-1.428.835-1.674 0l-.094-.319a1.873 1.873 0 0 0-2.692-1.115l-.292.16c-.764.415-1.6-.42-1.184-1.185l.159-.291A1.873 1.873 0 0 0 1.945 8.93l-.319-.094c-.835-.246-.835-1.428 0-1.674l.319-.094A1.873 1.873 0 0 0 3.06 4.474l-.16-.292c-.415-.764.42-1.6 1.185-1.184l.292.159a1.873 1.873 0 0 0 2.692-1.115l.094-.319z"/>
@@ -65,7 +65,8 @@
 
       <!-- Main split -->
       <div class="panel">
-        <div class="split">
+        <SettingsView v-if="showSettings" @close="showSettings = false" />
+        <div v-else class="split">
           <MrList
             ref="mrListRef"
             :ai-enabled="aiEnabled"
@@ -73,7 +74,7 @@
             @ai-review="onAiReview"
             @clone-needed="showCloneDialog"
           />
-          <DiffPanel />
+          <DiffPanel :ai-enabled="aiEnabled" :provider-label="providerLabel" />
         </div>
       </div>
     </div>
@@ -107,17 +108,22 @@ import { ref, computed, onMounted } from 'vue';
 import type { MR } from '../types';
 import { useMrsStore } from './stores/mrs';
 import { useFiltersStore } from './stores/filters';
+import { useAiStore } from './stores/ai';
 import { projectUrl } from './utils';
 import MrList from './components/MrList.vue';
 import DiffPanel from './components/DiffPanel.vue';
+import SettingsView from './components/SettingsView.vue';
 import './style.css';
 
 const mrs     = useMrsStore();
 const filters = useFiltersStore();
+const ai      = useAiStore();
 
 const mrListRef       = ref<InstanceType<typeof MrList> | null>(null);
 const sidebarCollapsed = ref(localStorage.getItem('sidebarCollapsed') === 'true');
 const aiEnabled       = ref(true);
+const aiProvider      = ref<string>('claude');
+const showSettings    = ref(false);
 const lastUpdated     = ref('');
 const pollState       = ref<'loading' | 'ok' | 'err'>('loading');
 const pollText        = ref('Connecting…');
@@ -128,6 +134,12 @@ const cloneCopied     = ref(false);
 interface Toast { id: number; msg: string; type: 'ok' | 'err' | 'info'; out: boolean }
 const toasts = ref<Toast[]>([]);
 let toastSeq = 0;
+
+const providerLabel = computed(() => {
+  if (aiProvider.value === 'copilot') return 'Copilot';
+  if (aiProvider.value === 'codex')   return 'Codex';
+  return 'Claude';
+});
 
 const tabs = computed(() => [
   { key: 'review' as const, icon: '👀', label: ' To Review', count: mrs.toReviewMrs.length },
@@ -196,7 +208,8 @@ async function prefetchRepoPaths(mrsArr: MR[]) {
 onMounted(async () => {
   // Load settings
   const settings = await window.api.getSettings();
-  aiEnabled.value = settings.aiReviewEnabled ?? true;
+  aiEnabled.value  = settings.aiReviewEnabled ?? true;
+  aiProvider.value = settings.aiReviewProvider ?? 'claude';
 
   // Load initial MR data
   const data = await window.api.getMrs();
@@ -217,10 +230,29 @@ onMounted(async () => {
   });
 
   window.api.onSettingsUpdated((s: any) => {
-    aiEnabled.value = s.aiReviewEnabled ?? true;
+    aiEnabled.value  = s.aiReviewEnabled ?? true;
+    aiProvider.value = s.aiReviewProvider ?? 'claude';
   });
 
-  window.api.onShowSettings(() => window.api.openSettings());
+  window.api.onShowSettings(() => { showSettings.value = true; });
+
+  // AI review IPC events
+  window.api.onClaudeChunk((text: string) => ai.appendChunk(text));
+
+  window.api.onClaudeDone(async () => {
+    const entry = ai.finishReview();
+    const mr = ai.reviewingMr;
+    if (!mr) return;
+    await window.api.saveReviewEntry(mr.id, entry);
+    if (mrs.activeMr?.id !== mr.id || mrs.activePanelTab !== 'ai') {
+      showToast(`✦ AI Review complete: ${mr.title.slice(0, 45)}${mr.title.length > 45 ? '…' : ''}`, 'ok', 6000);
+    }
+  });
+
+  window.api.onClaudeError((msg: string) => {
+    ai.failReview(msg);
+    showToast(msg, 'err', 5000);
+  });
 });
 </script>
 

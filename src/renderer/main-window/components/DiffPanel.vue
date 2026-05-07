@@ -44,20 +44,24 @@
         <div v-else class="diff-content" v-html="diffHtml"></div>
       </div>
 
-      <!-- AI panel placeholder -->
-      <div v-else class="diff-placeholder">
-        <div class="diff-placeholder-icon">✦</div>
-        <strong style="color:var(--text2);font-size:13px;">AI Review</strong>
-        <p>Coming soon in next phase.</p>
-      </div>
+      <!-- AI panel -->
+      <AiPanel
+        v-else
+        :mr="mrs.activeMr"
+        :ai-enabled="props.aiEnabled"
+        :provider-label="props.providerLabel"
+      />
     </template>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, watch } from 'vue';
+import { ref, watch, computed } from 'vue';
 import { useMrsStore } from '../stores/mrs';
 import * as Diff2Html from 'diff2html';
+import AiPanel from './AiPanel/index.vue';
+
+const props = defineProps<{ aiEnabled: boolean; providerLabel: string }>();
 
 const mrs = useMrsStore();
 const loadingDiff = ref(false);

@@ -39,6 +39,7 @@ interface ElectronAPI {
   onClaudeError: (cb: (msg: string) => void) => void;
   onMrsUpdated: (cb: (data: any) => void) => void;
   onSettingsUpdated: (cb: (data: any) => void) => void;
+  onShowSettings: (cb: () => void) => void;
 }
 
 declare interface Window {
