@@ -21,7 +21,6 @@ app.setAppUserModelId('com.panda-reviewer.app');
 
 let tray: Tray | null = null;
 let mainWindow: BrowserWindow | null = null;
-let settingsWindow: BrowserWindow | null = null;
 
 let cachedToReview: MergeRequest[] = [];
 let cachedMyMrs: MergeRequest[] = [];
@@ -43,11 +42,12 @@ function createMainWindow(): BrowserWindow {
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
+      nodeIntegrationInSubFrames: true,
     },
     show: false,
   });
 
-  win.loadFile(path.join(__dirname, '../../src/renderer/windows/main/index.html'));
+  win.loadFile(path.join(__dirname, '../renderer/main-window/index.html'));
 
   win.once('ready-to-show', () => win.show());
   win.on('focus', () => setWindowFocus(true));
@@ -57,31 +57,17 @@ function createMainWindow(): BrowserWindow {
   return win;
 }
 
-function createSettingsWindow(): BrowserWindow {
-  const win = new BrowserWindow({
-    width: 620,
-    height: 560,
-    resizable: false,
-    frame: false,
-    icon: getIconPath(),
-    backgroundColor: '#0d1117',
-    webPreferences: {
-      preload: path.join(__dirname, 'preload.js'),
-      contextIsolation: true,
-    },
-    show: false,
-  });
-
-  win.loadFile(path.join(__dirname, '../../src/renderer/windows/settings/index.html'));
-  win.once('ready-to-show', () => win.show());
-  win.on('closed', () => { settingsWindow = null; });
-
-  return win;
-}
-
 function openSettings(): void {
-  if (settingsWindow) { settingsWindow.focus(); return; }
-  settingsWindow = createSettingsWindow();
+  const win = mainWindow ?? (mainWindow = createMainWindow());
+  const showSettings = () => win.webContents.send('show-settings');
+
+  if (win.webContents.isLoading()) {
+    win.webContents.once('did-finish-load', showSettings);
+  } else {
+    showSettings();
+  }
+
+  win.focus();
 }
 
 function openMain(): void {
