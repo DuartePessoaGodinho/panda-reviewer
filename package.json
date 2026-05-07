@@ -1,6 +1,6 @@
 {
   "name": "panda-reviewer",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "description": "GitLab MR reviewer desktop app",
   "main": "dist/main/main.js",
   "scripts": {
@@ -32,8 +32,18 @@
     },
     "win": {
       "target": [
-        { "target": "nsis", "arch": ["x64"] },
-        { "target": "portable", "arch": ["x64"] }
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
       ],
       "icon": "assets/icon.ico"
     },
