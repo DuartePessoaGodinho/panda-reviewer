@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-labelledby="title desc">
+  <title id="title">Panda Reviewer icon</title>
+  <desc id="desc">A compact panda face app icon on a warm orange rounded square.</desc>
+  <defs>
+    <linearGradient id="bg" x1="168" y1="120" x2="856" y2="904" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ff9f2e"/>
+      <stop offset="0.52" stop-color="#fc6d26"/>
+      <stop offset="1" stop-color="#e24329"/>
+    </linearGradient>
+    <linearGradient id="face" x1="284" y1="278" x2="740" y2="814" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="1" stop-color="#e7edf5"/>
+    </linearGradient>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="126%" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="42" stdDeviation="42" flood-color="#641c12" flood-opacity="0.34"/>
+    </filter>
+  </defs>
+
+  <rect width="1024" height="1024" rx="232" fill="url(#bg)"/>
+  <path d="M210 703c58 106 168 174 302 174s244-68 302-174c-69 30-178 49-302 49s-233-19-302-49Z" fill="#a8331f" opacity="0.18"/>
+
+  <g filter="url(#shadow)">
+    <circle cx="306" cy="337" r="134" fill="#111827"/>
+    <circle cx="718" cy="337" r="134" fill="#111827"/>
+
+    <path fill="url(#face)" d="M802 553c0 190-130 304-290 304S222 743 222 553c0-173 119-298 290-298s290 125 290 298Z"/>
+    <path fill="#f7f9fc" d="M717 663c0 95-88 162-205 162s-205-67-205-162c0-83 83-139 205-139s205 56 205 139Z"/>
+
+    <ellipse cx="397" cy="526" rx="101" ry="122" transform="rotate(24 397 526)" fill="#111827"/>
+    <ellipse cx="627" cy="526" rx="101" ry="122" transform="rotate(-24 627 526)" fill="#111827"/>
+
+    <circle cx="412" cy="528" r="29" fill="#ffffff"/>
+    <circle cx="612" cy="528" r="29" fill="#ffffff"/>
+    <circle cx="423" cy="516" r="10" fill="#dce6f2"/>
+    <circle cx="601" cy="516" r="10" fill="#dce6f2"/>
+
+    <path fill="#111827" d="M512 588c38 0 67 21 67 48 0 31-31 58-67 58s-67-27-67-58c0-27 29-48 67-48Z"/>
+    <path d="M512 673v36" stroke="#111827" stroke-width="24" stroke-linecap="round"/>
+    <path d="M447 725c31 29 99 29 130 0" fill="none" stroke="#111827" stroke-width="24" stroke-linecap="round"/>
+
+    <path d="M346 414c43-28 96-35 143-12" fill="none" stroke="#111827" stroke-width="24" stroke-linecap="round" opacity="0.12"/>
+    <path d="M535 402c47-23 100-16 143 12" fill="none" stroke="#111827" stroke-width="24" stroke-linecap="round" opacity="0.12"/>
+  </g>
+</svg>
