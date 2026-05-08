@@ -1,6 +1,6 @@
 {
   "name": "panda-reviewer",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "description": "GitLab MR reviewer desktop app",
   "main": "dist/main/main.js",
   "scripts": {
