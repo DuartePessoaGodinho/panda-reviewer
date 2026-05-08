@@ -27,7 +27,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
 
       - name: Bump version
         run: npm version ${{ github.event.inputs.bump }} --no-git-tag-version
