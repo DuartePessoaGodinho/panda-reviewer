@@ -10,6 +10,11 @@ export interface ReviewCallbacks {
   onError: (msg: string) => void;
 }
 
+interface ReviewRefs {
+  sourceRef: string;
+  targetRef: string;
+}
+
 interface ProviderConfig {
   command: string;
   versionArgs: string[];
@@ -52,19 +57,61 @@ export function checkAiReviewCli(provider: AiReviewProvider): Promise<{ availabl
   });
 }
 
-export function startAiReview(
+function execGit(repoPath: string, args: string[]): Promise<void> {
+  return new Promise((resolve, reject) => {
+    execFile('git', args, { cwd: repoPath, maxBuffer: 1024 * 1024 }, (err, _stdout, stderr) => {
+      if (err) {
+        reject(new Error(stderr.trim() || err.message));
+      } else {
+        resolve();
+      }
+    });
+  });
+}
+
+async function fetchRef(repoPath: string, remoteRef: string, localRef: string): Promise<void> {
+  await execGit(repoPath, ['fetch', '--prune', 'origin', `+${remoteRef}:${localRef}`]);
+}
+
+async function prepareReviewRefs(
+  repoPath: string,
+  sourceBranch: string,
+  targetBranch: string,
+  mrIid?: number
+): Promise<ReviewRefs> {
+  const targetRef = `origin/${targetBranch}`;
+  await fetchRef(repoPath, `refs/heads/${targetBranch}`, `refs/remotes/origin/${targetBranch}`);
+
+  if (mrIid) {
+    const sourceRef = `origin/merge-requests/${mrIid}/head`;
+    try {
+      await fetchRef(repoPath, `refs/merge-requests/${mrIid}/head`, `refs/remotes/origin/merge-requests/${mrIid}/head`);
+      return { sourceRef, targetRef };
+    } catch (err) {
+      console.warn(`Failed to fetch MR head ref !${mrIid}; falling back to source branch:`, err);
+    }
+  }
+
+  const sourceRef = `origin/${sourceBranch}`;
+  await fetchRef(repoPath, `refs/heads/${sourceBranch}`, `refs/remotes/origin/${sourceBranch}`);
+  return { sourceRef, targetRef };
+}
+
+export async function startAiReview(
   provider: AiReviewProvider,
   repoPath: string,
   sourceBranch: string,
   targetBranch: string,
+  mrIid: number | undefined,
   mrTitle: string,
   userContext: string,
   callbacks: ReviewCallbacks
-): void {
+): Promise<void> {
   if (activeProcess) cancelAiReview();
 
   const config = PROVIDERS[provider];
-  const prompt = buildPrompt(sourceBranch, targetBranch, mrTitle, userContext);
+  const { sourceRef, targetRef } = await prepareReviewRefs(repoPath, sourceBranch, targetBranch, mrIid);
+  const prompt = buildPrompt(sourceRef, targetRef, sourceBranch, targetBranch, mrTitle, userContext);
 
   // Use shell:true so Windows can resolve CLI shims like claude.cmd, copilot.cmd, and codex.cmd.
   activeProcess = spawn(config.command, config.buildArgs(prompt), {
@@ -118,8 +165,10 @@ export function isReviewRunning(): boolean {
 }
 
 function buildPrompt(
-  source: string,
-  target: string,
+  sourceRef: string,
+  targetRef: string,
+  sourceBranch: string,
+  targetBranch: string,
   title: string,
   context: string
 ): string {
@@ -130,12 +179,13 @@ function buildPrompt(
   return `You are doing a code review for a GitLab merge request in this repository.
 
 MR title: ${title}
-Branch: ${source} -> ${target}
+Branch: ${sourceBranch} -> ${targetBranch}
+Fetched refs: ${sourceRef} -> ${targetRef}
 ${contextBlock}
 How to explore the changes (do NOT checkout any branch):
-- Run this git command to see all changed files and diffs: git diff ${target}...${source}
-- Run this git command to read a full file at branch state: git show ${source}:path/to/file
-- Run this git command to see the commits: git log ${target}..${source} --oneline
+- Run this git command to see all changed files and diffs: git diff ${targetRef}...${sourceRef}
+- Run this git command to read a full file at branch state: git show ${sourceRef}:path/to/file
+- Run this git command to see the commits: git log ${targetRef}..${sourceRef} --oneline
 
 Review guidelines:
 - Be specific: reference file names and line numbers

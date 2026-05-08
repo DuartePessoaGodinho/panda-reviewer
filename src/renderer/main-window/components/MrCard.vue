@@ -25,7 +25,6 @@
       />
       <div class="mr-meta">
         <div class="mr-header-row">
-          <span class="mr-ref">{{ mr.references?.full ?? '!' + mr.iid }}</span>
           <div class="mr-badges">
             <span v-if="draft" class="badge draft">Draft</span>
             <span v-if="pipelineStatus === 'success'" class="badge pipeline-ok">✓ CI</span>
@@ -41,27 +40,40 @@
           </div>
         </div>
         <div class="mr-title">{{ title }}</div>
-        <div class="mr-author">by <span>{{ mr.author.name }}</span> · {{ project }}</div>
+        <div class="mr-author">{{ mr.author.name }} <span class="mr-project">· {{ project }}</span></div>
       </div>
     </div>
 
     <div class="mr-card-bottom">
-      <span class="branch-chip" :title="mr.source_branch">{{ mr.source_branch }}</span>
-      <span class="arrow-icon">→</span>
-      <span class="branch-chip" :title="mr.target_branch">{{ mr.target_branch }}</span>
-      <span class="updated-time">{{ updatedAgo }}</span>
+      <span class="branch-chip" :title="mr.source_branch">
+        <svg width="8" height="8" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+          <path fill-rule="evenodd" d="M11.75 2.5a.75.75 0 1 0 1.5 0 .75.75 0 0 0-1.5 0zm.75 2.25a2.25 2.25 0 1 1 0-4.5 2.25 2.25 0 0 1 0 4.5zM4.25 13.5a.75.75 0 1 0 1.5 0 .75.75 0 0 0-1.5 0zm.75 2.25a2.25 2.25 0 1 1 0-4.5 2.25 2.25 0 0 1 0 4.5zM4.25 2.5a.75.75 0 1 0 1.5 0 .75.75 0 0 0-1.5 0zM5 4.75V8a1 1 0 0 0 1 1h4.25a2.25 2.25 0 1 1 0 1.5H6A2.5 2.5 0 0 1 3.5 8V4.75a2.25 2.25 0 1 1 1.5 0z"/>
+        </svg>
+        <span class="branch-name">{{ mr.source_branch }}</span>
+      </span>
+      <span class="branch-arrow">→</span>
+      <span class="branch-chip target" :title="mr.target_branch">
+        <span class="branch-name">{{ mr.target_branch }}</span>
+      </span>
+      <div class="mr-times">
+        <span class="mr-time" :title="createdTitle">Created {{ createdAgo }}</span>
+        <span class="mr-time" :title="updatedTitle">Updated {{ updatedAgo }}</span>
+      </div>
     </div>
 
-    <div class="card-actions" @click.stop>
+    <div class="card-actions" :class="{ 'has-approve': !approved }" @click.stop>
       <button
-        class="btn-sm ai ai-btn"
+        class="btn-sm ai"
         :disabled="!hasRepo || !aiEnabled"
         :title="aiDisabledTitle"
         @click="$emit('ai-review', mr)"
       >
-        ✦ AI Review
+        <svg width="9" height="9" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+          <path d="M8 0l1.5 5H16l-4.5 3.5L13 14 8 10l-5 4 1.5-5.5L0 5h6.5L8 0z"/>
+        </svg>
+        AI Review
       </button>
-      <button class="btn-sm ide-btn" @click="$emit('open-in-ide', mr)">
+      <button class="btn-sm ide-btn" title="Open in IDE" @click="$emit('open-in-ide', mr)">
         <svg width="11" height="11" viewBox="0 0 16 16" fill="currentColor">
           <path d="M14 1a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1h12zM2 0a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V2a2 2 0 0 0-2-2H2z"/>
           <path d="M6.854 4.646a.5.5 0 0 1 0 .708L4.207 8l2.647 2.646a.5.5 0 0 1-.708.708l-3-3a.5.5 0 0 1 0-.708l3-3a.5.5 0 0 1 .708 0zm2.292 0a.5.5 0 0 0 0 .708L11.793 8l-2.647 2.646a.5.5 0 0 0 .708.708l3-3a.5.5 0 0 0 0-.708l-3-3a.5.5 0 0 0-.708 0z"/>
@@ -70,7 +82,7 @@
       <button v-if="!approved" class="btn-sm approve-btn" title="Approve this MR" @click="$emit('approve', mr)">
         ✓ Approve
       </button>
-      <button class="btn-sm link" :title="'Open in browser'" @click="$emit('open-external', mr.web_url)">
+      <button class="btn-sm link" title="Open in browser" @click="$emit('open-external', mr.web_url)">
         <svg width="11" height="11" viewBox="0 0 16 16" fill="currentColor">
           <path d="M10.604 1h4.146a.25.25 0 0 1 .25.25v4.146a.25.25 0 0 1-.427.177L13.03 4.03 9.28 7.78a.75.75 0 0 1-1.06-1.06l3.75-3.75-1.543-1.543A.25.25 0 0 1 10.604 1zM3.75 2A1.75 1.75 0 0 0 2 3.75v8.5c0 .966.784 1.75 1.75 1.75h8.5A1.75 1.75 0 0 0 14 12.25v-3.5a.75.75 0 0 0-1.5 0v3.5a.25.25 0 0 1-.25.25h-8.5a.25.25 0 0 1-.25-.25v-8.5a.25.25 0 0 1 .25-.25h3.5a.75.75 0 0 0 0-1.5h-3.5z"/>
         </svg>
@@ -101,13 +113,22 @@ defineEmits<{
   'open-external': [url: string];
 }>();
 
-const avatarFallback = 'data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 26 26%22><rect width=%2226%22 height=%2226%22 fill=%22%2321262d%22/></svg>';
+const avatarFallback = 'data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 26 26%22><rect width=%2226%22 height=%2226%22 fill=%22%23232320%22/></svg>';
 
-const draft         = computed(() => isDraft(props.mr));
-const title         = computed(() => displayTitle(props.mr));
-const project       = computed(() => projectName(props.mr));
-const updatedAgo    = computed(() => timeAgo(props.mr.updated_at));
+const draft          = computed(() => isDraft(props.mr));
+const title          = computed(() => displayTitle(props.mr));
+const project        = computed(() => projectName(props.mr));
+const createdAgo     = computed(() => timeAgo(props.mr.created_at));
+const updatedAt      = computed(() => props.mr.review_activity_at ?? props.mr.updated_at);
+const updatedAgo     = computed(() => timeAgo(updatedAt.value));
 const pipelineStatus = computed(() => props.mr.head_pipeline?.status ?? null);
+const createdTitle   = computed(() => new Date(props.mr.created_at).toLocaleString());
+const activityLabel  = computed(() => {
+  if (props.mr.review_activity_kind === 'author_comment') return 'Latest author comment';
+  if (props.mr.review_activity_kind === 'commit') return 'Latest commit';
+  return 'Latest review activity';
+});
+const updatedTitle   = computed(() => `${activityLabel.value}: ${new Date(updatedAt.value).toLocaleString()}`);
 
 const aiDisabledTitle = computed(() => {
   if (!props.aiEnabled) return 'Enable AI Review in Settings first';
@@ -120,49 +141,163 @@ const aiDisabledTitle = computed(() => {
 .mr-card {
   background: var(--surface);
   border: 1px solid var(--border);
-  border-left: 3px solid var(--orange);
+  border-left: 2px solid var(--border);
   border-radius: 10px;
-  padding: 12px 14px;
-  margin-bottom: 8px;
+  padding: 13px 14px 11px;
+  margin-bottom: 6px;
   cursor: pointer;
   transition: border-color 0.15s, background 0.15s, box-shadow 0.15s;
+  position: relative;
+  min-width: 0;
+  overflow: hidden;
 }
-.mr-card:hover        { border-color: var(--accent); border-left-color: var(--orange); background: var(--surface2); box-shadow: 0 2px 12px rgba(0,0,0,0.25); }
-.mr-card:focus-visible{ outline: 2px solid var(--accent); outline-offset: 2px; }
-.mr-card.active       { border-color: var(--accent); border-left-color: var(--orange); background: var(--accent-bg); }
-.mr-card.card-pipeline-run  { border-left-color: var(--yellow); }
+.mr-card:hover {
+  background: var(--surface2);
+  border-color: var(--border2);
+  border-left-color: var(--border2);
+  box-shadow: 0 2px 16px rgba(0,0,0,0.3);
+}
+.mr-card:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* State: active selection */
+.mr-card.active {
+  background: var(--surface2);
+  border-color: var(--border2);
+  border-left-color: var(--accent);
+  box-shadow: 0 2px 16px rgba(0,0,0,0.3);
+}
+
+/* State: pipeline */
 .mr-card.card-pipeline-fail { border-left-color: var(--red); }
-.mr-card.card-approved      { border-left-color: var(--green); }
-.mr-card.draft              { border-left-color: var(--text3); }
+.mr-card.card-pipeline-run  { border-left-color: var(--yellow); }
 
-.mr-card-top { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 8px; }
-.avatar { width: 26px; height: 26px; border-radius: 50%; background: var(--border); flex-shrink: 0; object-fit: cover; }
+/* State: approved */
+.mr-card.card-approved { border-left-color: var(--accent); }
+
+/* State: draft */
+.mr-card.draft { opacity: 0.75; }
+.mr-card.draft:hover { opacity: 1; }
+
+/* Top section */
+.mr-card-top {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  min-width: 0;
+  margin-bottom: 9px;
+}
+
+.avatar {
+  width: 28px; height: 28px;
+  border-radius: 50%;
+  background: var(--surface2);
+  flex-shrink: 0;
+  object-fit: cover;
+  border: 1.5px solid var(--border2);
+}
+
 .mr-meta { flex: 1; min-width: 0; }
-.mr-header-row { display: flex; align-items: center; gap: 6px; margin-bottom: 3px; }
-.mr-ref {
-  font-size: 10px; color: var(--text3); font-family: monospace;
-  flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+
+.mr-header-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  margin-bottom: 4px;
 }
-.mr-badges { display: flex; gap: 4px; margin-left: auto; flex-shrink: 0; }
+
+.mr-badges {
+  display: flex;
+  gap: 4px;
+  margin-left: 0;
+  flex-shrink: 0;
+}
+
 .mr-title {
-  font-size: 13px; font-weight: 600; color: var(--text); line-height: 1.4;
-  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text);
+  line-height: 1.45;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  letter-spacing: -0.015em;
 }
-.mr-author { font-size: 11px; color: var(--text3); margin-top: 3px; }
-.mr-author span { color: var(--text2); }
 
-.mr-card-bottom { display: flex; align-items: center; gap: 5px; margin-top: 8px; }
+.mr-author {
+  font-size: 11px;
+  color: var(--text2);
+  margin-top: 3px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.mr-project { color: var(--text3); }
+
+/* Bottom branch section */
+.mr-card-bottom {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 0.85fr) auto;
+  align-items: center;
+  gap: 5px;
+  margin-top: 9px;
+  min-width: 0;
+}
+
 .branch-chip {
-  font-size: 10px; background: var(--bg); color: var(--text2);
-  border: 1px solid var(--border); border-radius: 4px; padding: 2px 6px;
-  font-family: monospace; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 110px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  background: var(--bg);
+  color: var(--text3);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 2px 6px;
+  font-family: var(--font-mono);
+  white-space: nowrap;
+  overflow: hidden;
+  min-width: 0;
 }
-.arrow-icon  { color: var(--text3); font-size: 10px; flex-shrink: 0; }
-.updated-time{ margin-left: auto; font-size: 10px; color: var(--text3); white-space: nowrap; }
+.branch-chip.target { color: var(--text2); }
+.branch-chip svg { flex-shrink: 0; opacity: 0.6; }
+.branch-name {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 
-.card-actions {
-  display: flex; gap: 5px;
-  margin-top: 10px; padding-top: 10px;
-  border-top: 1px solid var(--border);
+.branch-arrow { color: var(--text3); font-size: 10px; flex-shrink: 0; }
+
+.mr-times {
+  display: grid;
+  gap: 2px;
+  justify-items: end;
+  min-width: 82px;
 }
+
+.mr-time {
+  font-size: 10px;
+  color: var(--text3);
+  white-space: nowrap;
+  font-family: var(--font-mono);
+}
+
+/* Action buttons */
+.card-actions {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 33px 33px;
+  gap: 5px;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+  opacity: 0.7;
+  transition: opacity 0.15s;
+}
+.card-actions.has-approve {
+  grid-template-columns: minmax(0, 1fr) 33px minmax(92px, 0.8fr) 33px;
+}
+.mr-card:hover .card-actions { opacity: 1; }
 </style>

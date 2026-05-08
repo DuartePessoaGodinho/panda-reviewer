@@ -17,6 +17,7 @@ export interface MR {
   source_branch: string;
   target_branch: string;
   web_url: string;
+  created_at: string;
   updated_at: string;
   work_in_progress: boolean;
   user_notes_count: number;
@@ -24,6 +25,10 @@ export interface MR {
   approved_by: { user: { id: number } }[];
   head_pipeline: { status: string } | null;
   references: { full: string } | null;
+  sha?: string;
+  review_activity_at?: string;
+  review_activity_key?: string;
+  review_activity_kind?: 'commit' | 'author_comment' | 'created';
 }
 
 export interface AppSettings {

@@ -5,26 +5,45 @@
         <button
           v-for="opt in approvalOptions"
           :key="opt.value"
-          class="fb-pill"
+          class="fb-chip"
           :class="{ active: filters.approval === opt.value }"
           @click="filters.approval = opt.value"
         >{{ opt.label }}</button>
       </div>
-      <select class="fb-select" :value="filters.author" @change="filters.author = ($event.target as HTMLSelectElement).value">
-        <option value="all">All authors</option>
-        <option v-for="a in filters.uniqueAuthors" :key="a.username" :value="a.username">
-          {{ a.name }}
-        </option>
-      </select>
+
+      <div class="fb-select-wrap">
+        <svg class="fb-select-icon" width="10" height="10" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+          <path d="M6 8a3 3 0 1 0 0-6 3 3 0 0 0 0 6zm2-3a2 2 0 1 1-4 0 2 2 0 0 1 4 0zm4 8c0 1-1 1-1 1H1s-1 0-1-1 1-4 6-4 6 3 6 4zm-1-.004c-.001-.246-.154-.986-.832-1.664C9.516 10.68 8.289 10 6 10c-2.29 0-3.516.68-4.168 1.332-.678.678-.83 1.418-.832 1.664h10z"/>
+        </svg>
+        <select
+          class="fb-select"
+          :value="filters.author"
+          @change="filters.author = ($event.target as HTMLSelectElement).value"
+        >
+          <option value="all">All authors</option>
+          <option v-for="a in filters.uniqueAuthors" :key="a.username" :value="a.username">
+            {{ a.name }}
+          </option>
+        </select>
+      </div>
     </div>
+
     <div class="fb-row">
-      <button class="fb-pill toggle" :class="{ active: filters.noComments }" @click="filters.noComments = !filters.noComments">
-        No comments
+      <button
+        class="fb-chip toggle"
+        :class="{ active: filters.noComments }"
+        @click="filters.noComments = !filters.noComments"
+      >No comments</button>
+
+      <button
+        class="fb-chip toggle"
+        :class="{ active: filters.hideDrafts }"
+        @click="filters.hideDrafts = !filters.hideDrafts"
+      >Hide drafts</button>
+
+      <button v-if="filters.isAnyActive" class="fb-clear" @click="filters.reset()">
+        Clear all
       </button>
-      <button class="fb-pill toggle-draft" :class="{ active: filters.hideDrafts }" @click="filters.hideDrafts = !filters.hideDrafts">
-        Hide drafts
-      </button>
-      <button v-if="filters.isAnyActive" class="fb-clear" @click="filters.reset()">Clear</button>
     </div>
   </div>
 </template>
@@ -44,47 +63,117 @@ const approvalOptions: { value: ApprovalFilter; label: string }[] = [
 
 <style scoped>
 .filter-bar {
-  padding: 7px 10px 6px;
+  padding: 8px 10px 7px;
   border-bottom: 1px solid var(--border);
   display: flex;
   flex-direction: column;
-  gap: 5px;
+  gap: 6px;
   flex-shrink: 0;
   background: var(--surface);
 }
-.fb-row  { display: flex; align-items: center; gap: 4px; }
-.fb-group{ display: flex; gap: 2px; }
 
-.fb-pill {
-  font-size: 10px; font-weight: 600;
-  padding: 3px 8px; border-radius: 5px;
-  border: 1px solid var(--border2);
-  background: transparent; color: var(--text3);
-  cursor: pointer; line-height: 1.4; white-space: nowrap;
-  transition: background 0.1s, color 0.1s, border-color 0.1s;
+.fb-row {
+  display: flex;
+  align-items: center;
+  gap: 5px;
 }
-.fb-pill:hover        { background: var(--surface2); color: var(--text2); }
-.fb-pill.active       { background: var(--accent-bg); border-color: var(--accent-border); color: #58a6ff; }
-.fb-pill.toggle.active      { background: rgba(252,109,38,0.1); border-color: rgba(252,109,38,0.35); color: var(--orange); }
-.fb-pill.toggle-draft.active{ background: rgba(139,148,158,0.12); border-color: rgba(139,148,158,0.3); color: var(--text2); }
+
+.fb-group {
+  display: flex;
+  gap: 2px;
+}
+
+/* Filter chips */
+.fb-chip {
+  font-family: var(--font-ui);
+  font-size: 10.5px;
+  font-weight: 500;
+  padding: 3px 9px;
+  border-radius: 5px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text3);
+  cursor: pointer;
+  line-height: 1.5;
+  white-space: nowrap;
+  transition: background 0.12s, color 0.12s, border-color 0.12s;
+  letter-spacing: -0.01em;
+}
+.fb-chip:hover { background: var(--surface2); color: var(--text2); border-color: var(--border2); }
+
+/* Active state — approval filters use jade accent */
+.fb-chip.active {
+  background: var(--accent-dim);
+  border-color: var(--accent-border);
+  color: var(--accent);
+  font-weight: 600;
+}
+
+/* Toggle chips (no-comments, hide-drafts) */
+.fb-chip.toggle.active {
+  background: var(--surface2);
+  border-color: var(--border2);
+  color: var(--text2);
+  font-weight: 600;
+}
+
+/* Author select */
+.fb-select-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  flex: 1;
+  min-width: 0;
+  max-width: 135px;
+}
+
+.fb-select-icon {
+  position: absolute;
+  left: 7px;
+  color: var(--text3);
+  pointer-events: none;
+  flex-shrink: 0;
+}
 
 .fb-select {
-  font-size: 10px; padding: 3px 6px; border-radius: 5px;
-  border: 1px solid var(--border2);
-  background: var(--surface2); color: var(--text2);
-  cursor: pointer; outline: none;
-  flex: 1; min-width: 0; max-width: 130px;
+  font-family: var(--font-ui);
+  font-size: 10.5px;
+  font-weight: 500;
+  padding: 3px 7px 3px 22px;
+  border-radius: 5px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text2);
+  cursor: pointer;
+  outline: none;
+  width: 100%;
+  appearance: none;
+  letter-spacing: -0.01em;
+  transition: border-color 0.12s;
 }
-.fb-select:focus { border-color: var(--accent-border); }
-.fb-select option { background: var(--surface2); }
+.fb-select:hover  { border-color: var(--border2); }
+.fb-select:focus  { border-color: var(--accent-border); }
+.fb-select option { background: var(--surface2); color: var(--text); }
 
+/* Clear button */
 .fb-clear {
-  margin-left: auto; font-size: 10px;
-  padding: 2px 7px; border-radius: 5px;
+  margin-left: auto;
+  font-family: var(--font-ui);
+  font-size: 10.5px;
+  font-weight: 500;
+  padding: 3px 9px;
+  border-radius: 5px;
   border: 1px solid transparent;
-  background: transparent; color: var(--accent);
-  cursor: pointer; white-space: nowrap;
-  transition: background 0.1s;
+  background: transparent;
+  color: var(--text3);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.12s, color 0.12s, border-color 0.12s;
+  letter-spacing: -0.01em;
 }
-.fb-clear:hover { background: var(--accent-bg); }
+.fb-clear:hover {
+  background: var(--surface2);
+  color: var(--text2);
+  border-color: var(--border);
+}
 </style>

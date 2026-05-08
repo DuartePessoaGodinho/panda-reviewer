@@ -3,7 +3,7 @@ import { GitLabService, MergeRequest } from './gitlab';
 import { getSettings } from './settings';
 import { buildRepoCache } from './localRepo';
 
-type SnapshotMap = Map<number, string>; // mr.id → updated_at
+type SnapshotMap = Map<number, string>; // mr.id -> review activity key
 
 let reviewSnapshot: SnapshotMap = new Map();
 let myMrsSnapshot: SnapshotMap = new Map();
@@ -26,16 +26,21 @@ function notify(title: string, body: string): void {
   new Notification({ title, body }).show();
 }
 
+function reviewActivityKey(mr: MergeRequest): string {
+  return mr.review_activity_key ?? (mr.sha ? `commit:${mr.sha}` : `created:${mr.id}:${mr.created_at}`);
+}
+
 function detectChanges(
   prev: SnapshotMap,
   next: MergeRequest[],
   label: string
 ): void {
   for (const mr of next) {
-    const prevUpdated = prev.get(mr.id);
-    if (!prevUpdated) {
+    const prevActivity = prev.get(mr.id);
+    const nextActivity = reviewActivityKey(mr);
+    if (!prevActivity) {
       notify(`New MR — ${label}`, `${mr.references?.full ?? mr.title}\n${mr.title}`);
-    } else if (prevUpdated !== mr.updated_at) {
+    } else if (prevActivity !== nextActivity) {
       notify(`MR Updated — ${label}`, `${mr.references?.full ?? mr.title}\n${mr.title}`);
     }
   }
@@ -67,8 +72,8 @@ async function poll(): Promise<void> {
     }
     firstPoll = false;
 
-    reviewSnapshot = new Map(toReview.map(mr => [mr.id, mr.updated_at]));
-    myMrsSnapshot = new Map(myMrs.map(mr => [mr.id, mr.updated_at]));
+    reviewSnapshot = new Map(toReview.map(mr => [mr.id, reviewActivityKey(mr)]));
+    myMrsSnapshot = new Map(myMrs.map(mr => [mr.id, reviewActivityKey(mr)]));
 
     onUpdate?.(toReview, myMrs);
   } catch (err) {

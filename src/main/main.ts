@@ -164,10 +164,11 @@ ipcMain.handle('find-local-repo-for-mr', (_e, projectHttpUrl: string) => {
   return findLocalRepo(projectHttpUrl);
 });
 
-ipcMain.handle('start-claude-review', (_e, payload: {
+ipcMain.handle('start-claude-review', async (_e, payload: {
   repoPath: string;
   sourceBranch: string;
   targetBranch: string;
+  mrIid?: number;
   mrTitle: string;
   userContext: string;
 }) => {
@@ -179,26 +180,33 @@ ipcMain.handle('start-claude-review', (_e, payload: {
 
   if (isReviewRunning()) cancelAiReview();
 
-  startAiReview(
-    aiReviewProvider,
-    payload.repoPath,
-    payload.sourceBranch,
-    payload.targetBranch,
-    payload.mrTitle,
-    payload.userContext,
-    {
-      onChunk: (text) => mainWindow?.webContents.send('claude-chunk', text),
-      onDone:  ()     => mainWindow?.webContents.send('claude-done'),
-      onError: (msg)  => mainWindow?.webContents.send('claude-error', msg),
-    }
-  );
+  try {
+    await startAiReview(
+      aiReviewProvider,
+      payload.repoPath,
+      payload.sourceBranch,
+      payload.targetBranch,
+      payload.mrIid,
+      payload.mrTitle,
+      payload.userContext,
+      {
+        onChunk: (text) => mainWindow?.webContents.send('claude-chunk', text),
+        onDone:  ()     => mainWindow?.webContents.send('claude-done'),
+        onError: (msg)  => mainWindow?.webContents.send('claude-error', msg),
+      }
+    );
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    mainWindow?.webContents.send('claude-error', `Failed to update local MR refs before AI Review: ${msg}`);
+  }
 });
 
-ipcMain.handle('start-ai-review', (_e, payload: {
+ipcMain.handle('start-ai-review', async (_e, payload: {
   provider?: AiReviewProvider;
   repoPath: string;
   sourceBranch: string;
   targetBranch: string;
+  mrIid?: number;
   mrTitle: string;
   userContext: string;
 }) => {
@@ -210,19 +218,25 @@ ipcMain.handle('start-ai-review', (_e, payload: {
 
   if (isReviewRunning()) cancelAiReview();
 
-  startAiReview(
-    payload.provider ?? aiReviewProvider,
-    payload.repoPath,
-    payload.sourceBranch,
-    payload.targetBranch,
-    payload.mrTitle,
-    payload.userContext,
-    {
-      onChunk: (text) => mainWindow?.webContents.send('claude-chunk', text),
-      onDone:  ()     => mainWindow?.webContents.send('claude-done'),
-      onError: (msg)  => mainWindow?.webContents.send('claude-error', msg),
-    }
-  );
+  try {
+    await startAiReview(
+      payload.provider ?? aiReviewProvider,
+      payload.repoPath,
+      payload.sourceBranch,
+      payload.targetBranch,
+      payload.mrIid,
+      payload.mrTitle,
+      payload.userContext,
+      {
+        onChunk: (text) => mainWindow?.webContents.send('claude-chunk', text),
+        onDone:  ()     => mainWindow?.webContents.send('claude-done'),
+        onError: (msg)  => mainWindow?.webContents.send('claude-error', msg),
+      }
+    );
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    mainWindow?.webContents.send('claude-error', `Failed to update local MR refs before AI Review: ${msg}`);
+  }
 });
 
 ipcMain.handle('cancel-claude-review', () => cancelAiReview());

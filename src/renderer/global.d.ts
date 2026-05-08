@@ -16,8 +16,8 @@ interface ElectronAPI {
   checkClaudeCli: () => Promise<{ available: boolean; version?: string }>;
   checkAiReviewCli: (provider: AiReviewProvider) => Promise<{ available: boolean; version?: string }>;
   findLocalRepoForMr: (url: string) => Promise<string | null>;
-  startClaudeReview: (payload: { repoPath: string; sourceBranch: string; targetBranch: string; mrTitle: string; userContext: string }) => Promise<void>;
-  startAiReview: (payload: { provider?: AiReviewProvider; repoPath: string; sourceBranch: string; targetBranch: string; mrTitle: string; userContext: string }) => Promise<void>;
+  startClaudeReview: (payload: { repoPath: string; sourceBranch: string; targetBranch: string; mrIid?: number; mrTitle: string; userContext: string }) => Promise<void>;
+  startAiReview: (payload: { provider?: AiReviewProvider; repoPath: string; sourceBranch: string; targetBranch: string; mrIid?: number; mrTitle: string; userContext: string }) => Promise<void>;
   cancelClaudeReview: () => Promise<void>;
   cancelAiReview: () => Promise<void>;
   approveMr: (projectId: number, mrIid: number) => Promise<void>;

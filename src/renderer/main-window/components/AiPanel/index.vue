@@ -77,6 +77,7 @@ async function onRun(context: string) {
     repoPath: repoPath.value,
     sourceBranch: props.mr.source_branch,
     targetBranch: props.mr.target_branch,
+    mrIid: props.mr.iid,
     mrTitle: props.mr.title,
     userContext: context,
   });

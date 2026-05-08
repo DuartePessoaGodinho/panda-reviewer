@@ -16,7 +16,7 @@ export interface MergeRequest {
   created_at: string;
   updated_at: string;
   web_url: string;
-  author: { name: string; username: string; avatar_url: string };
+  author: { id: number; name: string; username: string; avatar_url: string };
   reviewers: { id: number; name: string; username: string }[];
   source_branch: string;
   target_branch: string;
@@ -25,10 +25,28 @@ export interface MergeRequest {
   head_pipeline?: { status: string };
   approved_by: { user: { id: number } }[];
   user_notes_count: number;
+  sha?: string;
+  review_activity_at?: string;
+  review_activity_key?: string;
+  review_activity_kind?: 'commit' | 'author_comment' | 'created';
 }
 
 interface MergeRequestApprovals {
   approved_by: { user: { id: number } }[];
+}
+
+interface MergeRequestCommit {
+  id: string;
+  committed_date: string;
+  created_at: string;
+}
+
+interface MergeRequestNote {
+  id: number;
+  created_at: string;
+  updated_at: string;
+  system: boolean;
+  author: { id: number };
 }
 
 export interface GitLabProject {
@@ -79,17 +97,95 @@ export class GitLabService {
     return this.get('/user');
   }
 
-  private async withApprovalInfo(mrs: MergeRequest[]): Promise<MergeRequest[]> {
+  private latestByDate<T>(items: T[], dateOf: (item: T) => string | undefined): T | null {
+    return items.reduce<T | null>((latest, item) => {
+      const itemTime = Date.parse(dateOf(item) ?? '');
+      if (!Number.isFinite(itemTime)) return latest;
+      if (!latest) return item;
+      return itemTime > Date.parse(dateOf(latest) ?? '') ? item : latest;
+    }, null);
+  }
+
+  private async getReviewActivity(mr: MergeRequest): Promise<Pick<MergeRequest, 'review_activity_at' | 'review_activity_key' | 'review_activity_kind'>> {
+    const [commitsResult, notesResult] = await Promise.allSettled([
+      this.get<MergeRequestCommit[]>(`/projects/${mr.project_id}/merge_requests/${mr.iid}/commits`, { per_page: 100 }),
+      this.get<MergeRequestNote[]>(`/projects/${mr.project_id}/merge_requests/${mr.iid}/notes`, {
+        per_page: 100,
+        sort: 'desc',
+        order_by: 'updated_at',
+      }),
+    ]);
+
+    if (commitsResult.status === 'rejected') {
+      console.warn(`Failed to fetch commits for MR ${mr.project_id}!${mr.iid}:`, commitsResult.reason);
+    }
+    if (notesResult.status === 'rejected') {
+      console.warn(`Failed to fetch notes for MR ${mr.project_id}!${mr.iid}:`, notesResult.reason);
+    }
+
+    const latestCommit = commitsResult.status === 'fulfilled'
+      ? this.latestByDate(commitsResult.value, commit => commit.committed_date ?? commit.created_at)
+      : null;
+    const latestAuthorNote = notesResult.status === 'fulfilled'
+      ? this.latestByDate(
+          notesResult.value.filter(note => !note.system && note.author?.id === mr.author.id),
+          note => note.updated_at ?? note.created_at
+        )
+      : null;
+
+    const commitAt = latestCommit?.committed_date ?? latestCommit?.created_at;
+    const noteAt = latestAuthorNote?.updated_at ?? latestAuthorNote?.created_at;
+    const commitTime = Date.parse(commitAt ?? '');
+    const noteTime = Date.parse(noteAt ?? '');
+
+    if (latestCommit && Number.isFinite(commitTime) && (!Number.isFinite(noteTime) || commitTime >= noteTime)) {
+      return {
+        review_activity_at: commitAt,
+        review_activity_key: `commit:${latestCommit.id}`,
+        review_activity_kind: 'commit',
+      };
+    }
+
+    if (latestAuthorNote && Number.isFinite(noteTime)) {
+      return {
+        review_activity_at: noteAt,
+        review_activity_key: `author-comment:${latestAuthorNote.id}:${noteAt}`,
+        review_activity_kind: 'author_comment',
+      };
+    }
+
+    return {
+      review_activity_at: mr.created_at,
+      review_activity_key: `created:${mr.id}:${mr.created_at}`,
+      review_activity_kind: 'created',
+    };
+  }
+
+  private async withReviewInfo(mrs: MergeRequest[]): Promise<MergeRequest[]> {
     return Promise.all(mrs.map(async (mr) => {
+      let approved_by = mr.approved_by ?? [];
+      let activity: Pick<MergeRequest, 'review_activity_at' | 'review_activity_key' | 'review_activity_kind'> = {
+        review_activity_at: mr.created_at,
+        review_activity_key: mr.sha ? `commit:${mr.sha}` : `created:${mr.id}:${mr.created_at}`,
+        review_activity_kind: mr.sha ? 'commit' : 'created',
+      };
+
       try {
         const approvals = await this.get<MergeRequestApprovals>(
           `/projects/${mr.project_id}/merge_requests/${mr.iid}/approvals`
         );
-        return { ...mr, approved_by: approvals.approved_by ?? [] };
+        approved_by = approvals.approved_by ?? [];
       } catch (err) {
         console.warn(`Failed to fetch approvals for MR ${mr.project_id}!${mr.iid}:`, err);
-        return { ...mr, approved_by: mr.approved_by ?? [] };
       }
+
+      try {
+        activity = await this.getReviewActivity(mr);
+      } catch (err) {
+        console.warn(`Failed to derive review activity for MR ${mr.project_id}!${mr.iid}:`, err);
+      }
+
+      return { ...mr, approved_by, ...activity };
     }));
   }
 
@@ -100,7 +196,7 @@ export class GitLabService {
       scope: 'all',
       per_page: 50,
     });
-    return this.withApprovalInfo(mrs);
+    return this.withReviewInfo(mrs);
   }
 
   async getMyOpenMrs(userId: number): Promise<MergeRequest[]> {
@@ -114,7 +210,7 @@ export class GitLabService {
       seen.add(mr.id);
       return true;
     });
-    return this.withApprovalInfo(mrs);
+    return this.withReviewInfo(mrs);
   }
 
   getProject(projectId: number): Promise<GitLabProject> {
