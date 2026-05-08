@@ -14,10 +14,10 @@
             <path d="M8 4.466V.534a.25.25 0 0 1 .41-.192l2.36 1.966c.12.1.12.284 0 .384L8.41 4.658A.25.25 0 0 1 8 4.466z"/>
           </svg>
         </button>
-        <button class="titlebar-btn" title="Minimize" @click="window.api.minimizeWindow()">
+        <button class="titlebar-btn" title="Minimize" @click="minimizeWindow">
           <svg viewBox="0 0 16 16" fill="currentColor"><path d="M2 8a.5.5 0 0 1 .5-.5h11a.5.5 0 0 1 0 1h-11A.5.5 0 0 1 2 8z"/></svg>
         </button>
-        <button class="titlebar-btn" title="Close" @click="window.api.closeWindow()">
+        <button class="titlebar-btn" title="Close" @click="closeWindow">
           <svg viewBox="0 0 16 16" fill="currentColor">
             <path d="M4.646 4.646a.5.5 0 0 1 .708 0L8 7.293l2.646-2.647a.5.5 0 0 1 .708.708L8.707 8l2.647 2.646a.5.5 0 0 1-.708.708L8 8.707l-2.646 2.647a.5.5 0 0 1-.708-.708L7.293 8 4.646 5.354a.5.5 0 0 1 0-.708z"/>
           </svg>
@@ -164,6 +164,14 @@ function setPollStatus(state: typeof pollState.value, text: string) {
 function toggleSidebar() {
   sidebarCollapsed.value = !sidebarCollapsed.value;
   localStorage.setItem('sidebarCollapsed', String(sidebarCollapsed.value));
+}
+
+function minimizeWindow() {
+  window.api.minimizeWindow();
+}
+
+function closeWindow() {
+  window.api.closeWindow();
 }
 
 function switchTab(tab: 'review' | 'mine') {

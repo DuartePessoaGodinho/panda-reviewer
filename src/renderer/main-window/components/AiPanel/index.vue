@@ -42,7 +42,7 @@
 
 <script setup lang="ts">
 import { computed, watch } from 'vue';
-import type { MR } from '../../../types';
+import type { MR, ReviewEntry } from '../../../types';
 import { useAiStore } from '../../stores/ai';
 import { useMrsStore } from '../../stores/mrs';
 import AiHistory from './AiHistory.vue';
@@ -65,7 +65,7 @@ watch(() => props.mr.id, async (id) => {
   ai.view = 'history';
 }, { immediate: true });
 
-function onRead(entry: ReturnType<typeof ai.history>[0]) {
+function onRead(entry: ReviewEntry) {
   ai.activeEntry = entry;
   ai.view = 'reading';
 }

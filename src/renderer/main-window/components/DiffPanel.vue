@@ -41,7 +41,17 @@
           <strong style="color:var(--text2)">Failed to load diff</strong>
           <p>Check your connection and try again.</p>
         </div>
-        <div v-else class="diff-content" v-html="diffHtml"></div>
+        <template v-else>
+          <div class="diff-summary">
+            <div class="diff-title" :title="mrs.activeMr.title">{{ mrs.activeMr.title }}</div>
+            <div class="diff-meta">
+              <span class="diff-badge files">{{ diffStats.files }} files</span>
+              <span class="diff-badge add">+{{ diffStats.added }}</span>
+              <span class="diff-badge del">-{{ diffStats.deleted }}</span>
+            </div>
+          </div>
+          <div class="diff-content" v-html="diffHtml"></div>
+        </template>
       </div>
 
       <!-- AI panel -->
@@ -56,7 +66,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch, computed } from 'vue';
+import { ref, watch } from 'vue';
 import { useMrsStore } from '../stores/mrs';
 import * as Diff2Html from 'diff2html';
 import AiPanel from './AiPanel/index.vue';
@@ -67,6 +77,7 @@ const mrs = useMrsStore();
 const loadingDiff = ref(false);
 const diffError   = ref(false);
 const diffHtml    = ref('');
+const diffStats   = ref({ files: 0, added: 0, deleted: 0 });
 
 watch(
   () => [mrs.activeMr, mrs.activePanelTab] as const,
@@ -75,8 +86,14 @@ watch(
     loadingDiff.value = true;
     diffError.value   = false;
     diffHtml.value    = '';
+    diffStats.value   = { files: 0, added: 0, deleted: 0 };
     try {
       const { changes } = await window.api.getMrDiff(mr.project_id, mr.iid);
+      diffStats.value = {
+        files: changes.length,
+        added: changes.reduce((n: number, c: any) => n + (c.diff.match(/^\+(?!\+\+)/gm) ?? []).length, 0),
+        deleted: changes.reduce((n: number, c: any) => n + (c.diff.match(/^-(?!--)/gm) ?? []).length, 0),
+      };
       const combined = changes
         .map((c: any) => `diff --git a/${c.old_path} b/${c.new_path}\n--- a/${c.old_path}\n+++ b/${c.new_path}\n${c.diff}`)
         .join('\n');
@@ -129,5 +146,190 @@ watch(
 .panel-tab.ai-tab.active { border-bottom-color: #7c3aed; color: #c084fc; }
 
 .diff-content-wrap { flex: 1; overflow: hidden; display: flex; flex-direction: column; }
-.diff-content { flex: 1; overflow: auto; padding: 12px; }
+.diff-summary {
+  min-height: 42px; flex-shrink: 0; padding: 9px 14px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg);
+  display: flex; align-items: center; gap: 12px;
+}
+.diff-title {
+  flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  color: var(--text); font-size: 13px; font-weight: 600;
+}
+.diff-meta { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+.diff-badge {
+  font-size: 10px; line-height: 1; padding: 4px 7px;
+  border-radius: 999px; font-weight: 700;
+}
+.diff-badge.files { background: var(--surface2); color: var(--text2); border: 1px solid var(--border2); }
+.diff-badge.add { background: rgba(63,185,80,0.13); color: var(--green); }
+.diff-badge.del { background: rgba(248,81,73,0.13); color: var(--red); }
+
+.diff-content {
+  flex: 1; min-height: 0; overflow: auto; padding: 12px;
+  background: var(--bg); user-select: text;
+}
+
+.diff-content :deep(.d2h-wrapper) {
+  background: transparent !important;
+  color: var(--text2) !important;
+}
+.diff-content :deep(.d2h-file-list-wrapper) {
+  background: var(--surface) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: 8px;
+  margin: 0 0 10px !important;
+  overflow: hidden;
+}
+.diff-content :deep(.d2h-file-list-header) {
+  background: var(--surface2) !important;
+  border-bottom: 1px solid var(--border) !important;
+  color: var(--text) !important;
+}
+.diff-content :deep(.d2h-file-list-title),
+.diff-content :deep(.d2h-file-list-line) {
+  color: var(--text2) !important;
+}
+.diff-content :deep(.d2h-file-list) {
+  background: var(--surface) !important;
+  margin: 0 !important;
+}
+.diff-content :deep(.d2h-file-list > li) {
+  border-color: var(--border) !important;
+}
+.diff-content :deep(.d2h-file-list a) {
+  color: #58a6ff !important;
+  text-decoration: none;
+}
+.diff-content :deep(.d2h-file-list a:hover) {
+  color: #79c0ff !important;
+  text-decoration: underline;
+}
+.diff-content :deep(.d2h-file-wrapper) {
+  background: var(--bg) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: 8px;
+  overflow: auto;
+  margin: 0 0 12px !important;
+  max-width: 100%;
+}
+.diff-content :deep(.d2h-file-header) {
+  height: 30px !important;
+  padding: 5px 10px !important;
+  background: var(--surface) !important;
+  border-color: var(--border) !important;
+  color: var(--text2) !important;
+  font-size: 12px !important;
+}
+.diff-content :deep(.d2h-file-name),
+.diff-content :deep(.d2h-file-name-wrapper),
+.diff-content :deep(.d2h-file-collapse),
+.diff-content :deep(.d2h-file-stats) {
+  color: var(--text2) !important;
+}
+.diff-content :deep(.d2h-diff-table) {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--bg) !important;
+  color: var(--text2) !important;
+  font-family: 'Cascadia Code', 'Fira Code', Consolas, monospace;
+  font-size: 12px;
+  line-height: 1.35;
+}
+.diff-content :deep(.d2h-diff-tbody) {
+  background: var(--bg) !important;
+}
+.diff-content :deep(.d2h-diff-tbody tr) {
+  background: var(--bg) !important;
+}
+.diff-content :deep(.d2h-code-side-linenumber),
+.diff-content :deep(.d2h-code-linenumber) {
+  position: static !important;
+  width: 7em !important;
+  min-width: 7em !important;
+  max-width: 7em !important;
+  padding: 0 8px !important;
+  background: var(--surface) !important;
+  border-color: var(--border) !important;
+  color: var(--text3) !important;
+  text-align: right !important;
+  vertical-align: top !important;
+  user-select: none;
+}
+.diff-content :deep(.d2h-code-line) {
+  display: block !important;
+  width: auto !important;
+  padding: 0 10px !important;
+  color: var(--text2) !important;
+  background: transparent !important;
+}
+.diff-content :deep(.d2h-code-line-ctn) {
+  display: inline !important;
+  width: auto !important;
+  color: inherit !important;
+  background: transparent !important;
+}
+.diff-content :deep(.d2h-code-line-prefix) {
+  color: var(--text3) !important;
+}
+.diff-content :deep(.d2h-cntx),
+.diff-content :deep(.d2h-cntx .d2h-code-line),
+.diff-content :deep(.d2h-cntx .d2h-code-line-ctn) {
+  background: var(--bg) !important;
+  color: var(--text2) !important;
+}
+.diff-content :deep(.d2h-ins) {
+  background: rgba(63,185,80,0.09) !important;
+}
+.diff-content :deep(.d2h-ins .d2h-code-line),
+.diff-content :deep(.d2h-ins .d2h-code-line-ctn) {
+  background: transparent !important;
+  color: #c9f0d0 !important;
+}
+.diff-content :deep(.d2h-del) {
+  background: rgba(248,81,73,0.10) !important;
+}
+.diff-content :deep(.d2h-del .d2h-code-line),
+.diff-content :deep(.d2h-del .d2h-code-line-ctn) {
+  background: transparent !important;
+  color: #ffd1cf !important;
+}
+.diff-content :deep(.d2h-info) {
+  background: rgba(88,166,255,0.10) !important;
+  color: var(--text2) !important;
+}
+.diff-content :deep(.d2h-info .d2h-code-line),
+.diff-content :deep(.d2h-info .d2h-code-line-ctn),
+.diff-content :deep(.d2h-info .d2h-code-linenumber) {
+  background: transparent !important;
+  color: var(--text2) !important;
+}
+.diff-content :deep(.d2h-code-line ins) {
+  background-color: rgba(63,185,80,0.34) !important;
+  color: inherit !important;
+  border-radius: 2px;
+  text-decoration: none;
+}
+.diff-content :deep(.d2h-code-line del) {
+  background-color: rgba(248,81,73,0.34) !important;
+  color: inherit !important;
+  border-radius: 2px;
+  text-decoration: none;
+}
+.diff-content :deep(.d2h-emptyplaceholder) {
+  background: var(--surface) !important;
+  border-color: var(--border) !important;
+}
+.diff-content :deep(.d2h-tag) {
+  display: none;
+  background: transparent !important;
+}
+.diff-content :deep(.d2h-file-added-icon) { color: var(--green) !important; }
+.diff-content :deep(.d2h-file-deleted-icon) { color: var(--red) !important; }
+.diff-content :deep(.d2h-file-renamed-icon) { color: var(--yellow) !important; }
+
+@media (max-width: 760px) {
+  .diff-summary { align-items: flex-start; flex-direction: column; gap: 7px; }
+  .diff-meta { width: 100%; }
+}
 </style>
