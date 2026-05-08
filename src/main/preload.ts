@@ -36,4 +36,7 @@ contextBridge.exposeInMainWorld('api', {
   onSettingsUpdated: (cb: (data: unknown) => void) => {
     ipcRenderer.on('settings-updated', (_e, data) => cb(data));
   },
+  onShowSettings: (cb: () => void) => {
+    ipcRenderer.on('show-settings', () => cb());
+  },
 });

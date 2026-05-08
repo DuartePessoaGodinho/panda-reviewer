@@ -1,12 +1,4 @@
-interface ReviewEntry {
-  id: string;
-  createdAt: string;
-  context: string;
-  output: string;
-  notes: string;
-}
-
-type AiReviewProvider = 'claude' | 'copilot' | 'codex';
+import type { AiReviewProvider, ReviewEntry } from './types';
 
 interface ElectronAPI {
   getSettings: () => Promise<any>;
@@ -39,8 +31,13 @@ interface ElectronAPI {
   onClaudeError: (cb: (msg: string) => void) => void;
   onMrsUpdated: (cb: (data: any) => void) => void;
   onSettingsUpdated: (cb: (data: any) => void) => void;
+  onShowSettings: (cb: () => void) => void;
 }
 
-declare interface Window {
-  api: ElectronAPI;
+declare global {
+  interface Window {
+    api: ElectronAPI;
+  }
 }
+
+export {};

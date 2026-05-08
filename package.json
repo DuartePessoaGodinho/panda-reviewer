@@ -4,7 +4,11 @@
   "description": "GitLab MR reviewer desktop app",
   "main": "dist/main/main.js",
   "scripts": {
-    "build": "tsc -p tsconfig.json && tsc -p tsconfig.renderer.json",
+    "build:main": "tsc -p tsconfig.json",
+    "build:renderer": "vue-tsc -p tsconfig.vue.json --noEmit && vite build",
+    "build": "npm run build:main && npm run build:renderer",
+    "dev:renderer": "vite",
+    "dev": "npm run build:main && concurrently \"vite\" \"electron dist/main/main.js\"",
     "icons": "powershell -ExecutionPolicy Bypass -File scripts/generate-icons.ps1",
     "start": "npm run build && electron dist/main/main.js",
     "dist": "npm run build && electron-builder",
@@ -12,16 +16,21 @@
   },
   "devDependencies": {
     "@types/node": "^20.0.0",
+    "@vitejs/plugin-vue": "^6.0.6",
     "concurrently": "^8.0.0",
     "electron": "^31.0.0",
     "electron-builder": "^24.0.0",
-    "typescript": "^5.4.0"
+    "typescript": "^5.4.0",
+    "vite": "^8.0.11",
+    "vue-tsc": "^3.2.8"
   },
   "dependencies": {
     "axios": "^1.7.0",
     "diff2html": "^3.4.0",
     "electron-store": "^8.1.0",
-    "electron-updater": "^6.3.0"
+    "electron-updater": "^6.3.0",
+    "pinia": "^3.0.4",
+    "vue": "^3.5.34"
   },
   "build": {
     "appId": "com.panda-reviewer.app",
@@ -54,7 +63,6 @@
     },
     "files": [
       "dist/**/*",
-      "src/renderer/**/*",
       "assets/**/*"
     ]
   }
