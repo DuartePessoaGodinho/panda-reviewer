@@ -31,8 +31,8 @@ function getIconPath(): string {
 
 function createMainWindow(): BrowserWindow {
   const win = new BrowserWindow({
-    width: 900,
-    height: 680,
+    width: 1200,
+    height: 820,
     minWidth: 720,
     minHeight: 500,
     frame: false,

@@ -76,7 +76,12 @@
               </span>
             </div>
           </div>
-          <div class="diff-content" @click="handleDiffContentClick" v-html="diffHtml"></div>
+          <div
+            class="diff-content"
+            @click="handleDiffContentClick"
+            @keydown="handleDiffContentKeydown"
+            v-html="diffHtml"
+          ></div>
         </template>
       </div>
 
@@ -115,11 +120,17 @@ function makeDiffFilesCollapsible(html: string) {
 
     header.querySelector('.d2h-file-collapse')?.remove();
 
+    const filePath = header.querySelector('.d2h-file-name-wrapper');
+    filePath?.classList.add('d2h-file-path-toggle');
+    filePath?.setAttribute('role', 'button');
+    filePath?.setAttribute('tabindex', '0');
+    filePath?.setAttribute('title', 'Collapse file diff');
+
     const toggle = doc.createElement('button');
     toggle.type = 'button';
     toggle.className = 'd2h-file-toggle';
-    toggle.textContent = 'Collapse';
     toggle.setAttribute('aria-expanded', 'true');
+    toggle.setAttribute('aria-label', 'Collapse file diff');
     toggle.setAttribute('title', 'Collapse file diff');
 
     header.appendChild(toggle);
@@ -128,20 +139,41 @@ function makeDiffFilesCollapsible(html: string) {
   return doc.body.firstElementChild?.innerHTML ?? html;
 }
 
-function handleDiffContentClick(event: MouseEvent) {
-  const target = event.target as HTMLElement | null;
-  const toggle = target?.closest<HTMLButtonElement>('.d2h-file-toggle');
-  if (!toggle) return;
-
-  const file = toggle.closest('.d2h-file-wrapper');
+function toggleFileDiff(file: Element) {
   const fileDiff = file?.querySelector('.d2h-file-diff');
-  if (!file || !fileDiff) return;
+  const toggle = file.querySelector<HTMLButtonElement>('.d2h-file-toggle');
+  const filePath = file.querySelector<HTMLElement>('.d2h-file-path-toggle');
+  if (!fileDiff || !toggle) return;
 
   const isCollapsed = file.classList.toggle('d2h-file-collapsed');
   fileDiff.classList.toggle('d2h-d-none', isCollapsed);
-  toggle.textContent = isCollapsed ? 'Expand' : 'Collapse';
   toggle.setAttribute('aria-expanded', String(!isCollapsed));
+  toggle.setAttribute('aria-label', isCollapsed ? 'Expand file diff' : 'Collapse file diff');
   toggle.setAttribute('title', isCollapsed ? 'Expand file diff' : 'Collapse file diff');
+  filePath?.setAttribute('title', isCollapsed ? 'Expand file diff' : 'Collapse file diff');
+}
+
+function findToggleFile(target: HTMLElement | null) {
+  const control = target?.closest('.d2h-file-toggle, .d2h-file-path-toggle');
+  return control?.closest('.d2h-file-wrapper') ?? null;
+}
+
+function handleDiffContentClick(event: MouseEvent) {
+  const file = findToggleFile(event.target as HTMLElement | null);
+  if (!file) return;
+
+  event.preventDefault();
+  toggleFileDiff(file);
+}
+
+function handleDiffContentKeydown(event: KeyboardEvent) {
+  if (event.key !== 'Enter' && event.key !== ' ') return;
+
+  const file = findToggleFile(event.target as HTMLElement | null);
+  if (!file) return;
+
+  event.preventDefault();
+  toggleFileDiff(file);
 }
 
 watch(
@@ -500,26 +532,43 @@ watch(
   min-width: 0;
   width: auto;
 }
+.diff-content :deep(.d2h-file-path-toggle) {
+  cursor: pointer;
+  border-radius: 4px;
+}
+.diff-content :deep(.d2h-file-path-toggle:hover .d2h-file-name),
+.diff-content :deep(.d2h-file-path-toggle:focus-visible .d2h-file-name) {
+  color: var(--accent) !important;
+}
+.diff-content :deep(.d2h-file-path-toggle:focus-visible) {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--accent-bg);
+}
 .diff-content :deep(.d2h-file-toggle) {
   margin-left: auto;
-  height: 22px;
-  padding: 0 8px;
+  width: 24px;
+  height: 24px;
+  padding: 0;
   border: 1px solid var(--border2);
   border-radius: 5px;
   background: var(--surface2);
   color: var(--text3);
-  font-family: var(--font-ui);
-  font-size: 10.5px;
-  font-weight: 600;
   cursor: pointer;
   flex-shrink: 0;
-  transition: background 0.14s, border-color 0.14s, color 0.14s;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.14s, border-color 0.14s, color 0.14s, transform 0.14s;
 }
 .diff-content :deep(.d2h-file-toggle::before) {
-  content: "v";
+  content: "";
   display: inline-block;
-  margin-right: 5px;
-  color: var(--text3);
+  width: 6px;
+  height: 6px;
+  border: solid currentColor;
+  border-width: 0 2px 2px 0;
+  transform: translateY(-1px) rotate(45deg);
+  transition: transform 0.16s ease;
 }
 .diff-content :deep(.d2h-file-toggle:hover) {
   background: var(--surface3);
@@ -535,7 +584,7 @@ watch(
   border-bottom: 0 !important;
 }
 .diff-content :deep(.d2h-file-collapsed .d2h-file-toggle::before) {
-  content: ">";
+  transform: translateX(-1px) rotate(-45deg);
 }
 .diff-content :deep(.d2h-diff-table) {
   width: 100%;

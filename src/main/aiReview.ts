@@ -34,8 +34,8 @@ const PROVIDERS: Record<AiReviewProvider, ProviderConfig> = {
   copilot: {
     command: 'copilot',
     versionArgs: ['--version'],
-    buildArgs: (prompt) => ['--yolo', '--silent', '-p', prompt],
-    promptViaStdin: false,
+    buildArgs: () => ['--yolo', '--silent'],
+    promptViaStdin: true,
     displayName: 'Copilot',
   },
   codex: {

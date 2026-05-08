@@ -256,8 +256,8 @@ onMounted(async () => {
   window.api.onClaudeChunk((text: string) => ai.appendChunk(text));
 
   window.api.onClaudeDone(async () => {
-    const entry = ai.finishReview();
     const mr = ai.reviewingMr;
+    const entry = ai.finishReview();
     if (!mr) return;
     await window.api.saveReviewEntry(mr.id, entry);
     if (mrs.activeMr?.id !== mr.id || mrs.activePanelTab !== 'ai') {

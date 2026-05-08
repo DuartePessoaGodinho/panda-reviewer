@@ -42,7 +42,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue';
 import type { ReviewEntry } from '../../../types';
-import { renderMarkdown, slugify } from '../../utils';
+import { renderMarkdown, slugify, extractCodexReview } from '../../utils';
 
 const props = defineProps<{ entry: ReviewEntry; mrId: number }>();
 defineEmits<{ back: []; rerun: [] }>();
@@ -53,11 +53,11 @@ const savedMsg   = ref('');
 const hasNotes   = computed(() => !!notes.value.trim());
 let saveDebounce: ReturnType<typeof setTimeout> | null = null;
 
-const renderedOutput = computed(() => renderMarkdown(props.entry.output));
+const renderedOutput = computed(() => renderMarkdown(extractCodexReview(props.entry.output)));
 
 interface TocItem { label: string; slug: string }
 const toc = computed((): TocItem[] => {
-  const matches = [...props.entry.output.matchAll(/^## (.+)$/gm)];
+  const matches = [...extractCodexReview(props.entry.output).matchAll(/^## (.+)$/gm)];
   return matches.map(m => ({ label: m[1], slug: `h-${slugify(m[1])}` }));
 });
 

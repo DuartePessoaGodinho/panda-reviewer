@@ -12,6 +12,9 @@
           GitLab Token
           <a class="setting-link" @click="openTokenHelp">Get a token ↗</a>
         </div>
+        <p class="setting-description">
+          Used to load your merge requests from GitLab. The token is checked when you type and saved locally when you press Save.
+        </p>
         <input
           v-model="token"
           type="password"
@@ -30,6 +33,9 @@
           Local repo folders
           <button class="btn-add" @click="addPath">+ Add folder</button>
         </div>
+        <p class="setting-description">
+          Panda searches these folders to match GitLab projects with local clones, so Open in IDE and AI Review can work from your files.
+        </p>
         <div class="path-list" id="pathList">
           <div v-for="(p, i) in paths" :key="i" class="path-row">
             <input v-model="paths[i]" type="text" class="setting-input" spellcheck="false" />
@@ -46,6 +52,9 @@
       <!-- IDE -->
       <div class="setting-section">
         <div class="setting-label">IDE</div>
+        <p class="setting-description">
+          Select which editor opens when you jump from a merge request to its matching local repository.
+        </p>
         <div class="option-grid">
           <button class="option-btn" :class="{ selected: ide === 'vscode' }" @click="ide = 'vscode'">
             <span class="option-icon">⌨</span> VS Code
@@ -66,6 +75,9 @@
           Polling interval
           <span class="setting-value">{{ pollingMins }} min</span>
         </div>
+        <p class="setting-description">
+          Controls how often Panda refreshes merge requests while the app is in the background. Focused windows refresh more aggressively.
+        </p>
         <input
           v-model.number="pollingMins"
           type="range" min="1" max="60" class="setting-range"
@@ -81,6 +93,9 @@
             <span class="toggle-track"></span>
           </label>
         </div>
+        <p class="setting-description">
+          Enables local CLI reviews for merge requests. The selected provider reads your local repo and writes the review back in the app.
+        </p>
         <div class="option-grid" :class="{ disabled: !aiEnabled }">
           <button class="option-btn" :class="{ selected: aiProvider === 'claude' }" @click="aiProvider = 'claude'">
             <span class="option-icon">✦</span> Claude
@@ -218,6 +233,13 @@ async function onSave() {
   font-size: 11px; font-weight: 700; color: var(--text2);
   text-transform: uppercase; letter-spacing: 0.05em;
   display: flex; align-items: center; gap: 8px;
+}
+.setting-description {
+  color: var(--text3);
+  font-size: 11px;
+  line-height: 1.45;
+  max-width: 760px;
+  user-select: none;
 }
 .setting-value { margin-left: auto; font-weight: 400; color: var(--text3); text-transform: none; letter-spacing: 0; }
 .setting-link  { margin-left: auto; font-size: 11px; color: var(--accent); cursor: pointer; font-weight: 400; text-transform: none; letter-spacing: 0; }

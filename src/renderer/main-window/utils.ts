@@ -33,6 +33,21 @@ export function slugify(t: string): string {
   return t.toLowerCase().replace(/\s+/g, '-').replace(/[^\w-]/g, '');
 }
 
+export function extractCodexReview(output: string): string {
+  if (!output.includes('OpenAI Codex')) return output;
+
+  // Split on lone "codex" lines — each marks a new assistant turn in the session log
+  const parts = output.split(/(?:^|\n)codex\n/);
+  if (parts.length < 2) return output;
+
+  // The last block is the final review; strip the trailing "tokens used" footer
+  const last = parts[parts.length - 1]
+    .replace(/\ntokens used[\s\S]*$/, '')
+    .trim();
+
+  return last || output;
+}
+
 export function renderMarkdown(text: string): string {
   if (!text) return '';
   return text
