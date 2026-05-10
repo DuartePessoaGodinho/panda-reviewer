@@ -27,12 +27,14 @@
         :index="i"
         :is-active="mrs.activeMr?.id === mr.id"
         :approved="mrs.approvedByMe(mr)"
+        :pinned="mrs.isPinned(mr)"
         :has-repo="mrs.repoCache[mr.project_id] != null"
         :ai-enabled="aiEnabled"
         @open="onOpen"
         @ai-review="onAiReview"
         @open-in-ide="onOpenInIde"
         @approve="onApprove"
+        @toggle-pin="onTogglePin"
         @open-external="onOpenExternal"
       />
     </div>
@@ -69,12 +71,24 @@ const isFiltered = computed(() =>
   filters.isAnyActive && filters.sourceMrs.length > 0 && filters.filteredMrs.length === 0
 );
 
-const emptyIcon  = computed(() => isFiltered.value ? '🔍' : (filters.activeTab === 'review' ? '✅' : '📭'));
-const emptyTitle = computed(() => isFiltered.value ? 'No matches' : (filters.activeTab === 'review' ? 'Nothing to review' : 'No open MRs'));
+const emptyIcon  = computed(() => {
+  if (isFiltered.value) return '🔍';
+  if (filters.activeTab === 'review') return '✅';
+  if (filters.activeTab === 'pinned') return '📌';
+  return '📭';
+});
+const emptyTitle = computed(() => {
+  if (isFiltered.value) return 'No matches';
+  if (filters.activeTab === 'review') return 'Nothing to review';
+  if (filters.activeTab === 'pinned') return 'No pinned MRs';
+  return 'No open MRs';
+});
 const emptySub   = computed(() => isFiltered.value
   ? 'No MRs match your current filters.<br>Try relaxing or clearing them.'
   : (filters.activeTab === 'review'
     ? "You're all caught up.<br>No MRs are waiting for your review."
+    : filters.activeTab === 'pinned'
+      ? 'Pin merge requests from To Review or My MRs<br>to keep them together here.'
     : 'You have no open merge requests right now.')
 );
 
@@ -102,6 +116,10 @@ async function onApprove(mr: MR) {
   } catch {
     // toast handled by parent
   }
+}
+
+function onTogglePin(mr: MR) {
+  mrs.togglePinned(mr);
 }
 
 function onOpenExternal(url: string) {

@@ -44,28 +44,28 @@ function onRun() {
   display: flex; align-items: center; gap: 10px;
   padding: 10px 16px; border-bottom: 1px solid var(--border); flex-shrink: 0;
 }
-.ai-new-title { font-size: 13px; font-weight: 700; color: var(--text2); }
+.ai-new-title { font-size: 15px; font-weight: 700; color: var(--text2); }
 .ai-new-body  { padding: 16px; display: flex; flex-direction: column; gap: 12px; }
-.ai-new-label { font-size: 11px; font-weight: 600; color: var(--text2); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px; }
-.ai-new-hint  { font-size: 11px; color: var(--text3); line-height: 1.5; }
+.ai-new-label { font-size: 12px; font-weight: 600; color: var(--text2); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px; }
+.ai-new-hint  { font-size: 12px; color: var(--text3); line-height: 1.5; }
 
 .ai-back-btn {
   padding: 3px 10px; border: 1px solid var(--border2);
   background: transparent; color: var(--text2); border-radius: 5px;
-  font-size: 11px; cursor: pointer; transition: background 0.1s; flex-shrink: 0;
+  font-size: 12px; cursor: pointer; transition: background 0.1s; flex-shrink: 0;
 }
 .ai-back-btn:hover { background: var(--surface2); color: var(--text); }
 
 .ai-cancel-btn {
   padding: 3px 10px; border: 1px solid var(--border2);
   background: transparent; color: var(--text2); border-radius: 5px;
-  font-size: 11px; cursor: pointer; transition: background 0.1s;
+  font-size: 12px; cursor: pointer; transition: background 0.1s;
 }
 .ai-cancel-btn:hover { background: var(--surface2); color: var(--text); }
 
 .ai-context-textarea {
   width: 100%; background: var(--surface); border: 1px solid var(--border2);
-  border-radius: 8px; color: var(--text); font-size: 12px;
+  border-radius: 8px; color: var(--text); font-size: 13px;
   padding: 10px 12px; resize: vertical; min-height: 64px; max-height: 120px;
   outline: none; font-family: inherit; line-height: 1.5;
   transition: border-color 0.15s, box-shadow 0.15s; user-select: text;
@@ -77,7 +77,7 @@ function onRun() {
   height: 34px; padding: 0 16px;
   background: linear-gradient(135deg, #4c1d95 0%, #5b21b6 100%);
   border: 1px solid #7c3aed; color: #e9d5ff;
-  border-radius: 7px; font-size: 12px; font-weight: 700; cursor: pointer;
+  border-radius: 7px; font-size: 13px; font-weight: 700; cursor: pointer;
   transition: background 0.15s, box-shadow 0.15s; flex-shrink: 0;
 }
 .ai-run-btn:hover { background: linear-gradient(135deg, #5b21b6 0%, #6d28d9 100%); box-shadow: 0 2px 12px rgba(124,58,237,0.3); }

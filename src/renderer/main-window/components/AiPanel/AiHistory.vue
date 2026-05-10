@@ -70,12 +70,12 @@ function reviewPreview(output: string): string {
   display: flex; align-items: center; justify-content: space-between;
   padding: 12px 16px 10px; border-bottom: 1px solid var(--border); flex-shrink: 0;
 }
-.ai-hist-title { font-size: 13px; font-weight: 700; color: var(--text2); }
+.ai-hist-title { font-size: 15px; font-weight: 700; color: var(--text2); }
 .ai-new-btn {
   padding: 4px 12px;
   background: linear-gradient(135deg, #4c1d95, #5b21b6);
   border: 1px solid #7c3aed; color: #e9d5ff;
-  border-radius: 6px; font-size: 11px; font-weight: 700; cursor: pointer;
+  border-radius: 6px; font-size: 12px; font-weight: 700; cursor: pointer;
   transition: background 0.15s;
 }
 .ai-new-btn:hover { background: linear-gradient(135deg, #5b21b6, #6d28d9); }
@@ -83,15 +83,15 @@ function reviewPreview(output: string): string {
 .ai-repo-warning {
   margin: 12px 16px 0; padding: 10px 12px;
   background: rgba(210,153,34,0.08); border: 1px solid rgba(210,153,34,0.2);
-  border-radius: 8px; font-size: 11px; color: var(--yellow); flex-shrink: 0;
+  border-radius: 8px; font-size: 12px; color: var(--yellow); flex-shrink: 0;
 }
 
 .ai-hist-list { flex: 1; overflow-y: auto; min-height: 0; }
 .ai-hist-empty {
   display: flex; flex-direction: column; align-items: center; justify-content: center;
-  height: 100%; gap: 6px; color: var(--text3); font-size: 12px; text-align: center; padding: 20px;
+  height: 100%; gap: 6px; color: var(--text3); font-size: 13px; text-align: center; padding: 20px;
 }
-.ai-hist-empty strong { color: var(--text2); font-size: 13px; }
+.ai-hist-empty strong { color: var(--text2); font-size: 15px; }
 
 .ai-hist-item {
   padding: 11px 16px; border-bottom: 1px solid var(--border);
@@ -99,12 +99,12 @@ function reviewPreview(output: string): string {
 }
 .ai-hist-item:hover { background: var(--surface2); }
 .ai-hist-item-top { display: flex; align-items: center; gap: 8px; margin-bottom: 3px; }
-.ai-hist-date { font-size: 12px; font-weight: 600; color: var(--text2); }
-.ai-hist-notes-dot { font-size: 11px; }
-.ai-hist-context { font-size: 11px; color: var(--text3); font-style: italic; }
+.ai-hist-date { font-size: 13px; font-weight: 600; color: var(--text2); }
+.ai-hist-notes-dot { font-size: 12px; }
+.ai-hist-context { font-size: 12px; color: var(--text3); font-style: italic; }
 .ai-hist-context.no-context { color: var(--border2); }
 .ai-hist-preview {
-  font-size: 11px; color: var(--text3); margin-top: 3px;
+  font-size: 12px; color: var(--text3); margin-top: 3px;
   line-height: 1.4; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 
@@ -112,7 +112,7 @@ function reviewPreview(output: string): string {
   height: 34px; padding: 0 16px;
   background: linear-gradient(135deg, #4c1d95 0%, #5b21b6 100%);
   border: 1px solid #7c3aed; color: #e9d5ff;
-  border-radius: 7px; font-size: 12px; font-weight: 700; cursor: pointer;
+  border-radius: 7px; font-size: 13px; font-weight: 700; cursor: pointer;
   transition: background 0.15s, box-shadow 0.15s; flex-shrink: 0;
 }
 .ai-run-btn:hover { background: linear-gradient(135deg, #5b21b6 0%, #6d28d9 100%); box-shadow: 0 2px 12px rgba(124,58,237,0.3); }

@@ -100,19 +100,19 @@ function onNotesInput() {
 .ai-back-btn {
   padding: 3px 10px; border: 1px solid var(--border2);
   background: transparent; color: var(--text2); border-radius: 5px;
-  font-size: 11px; cursor: pointer; transition: background 0.1s; flex-shrink: 0;
+  font-size: 12px; cursor: pointer; transition: background 0.1s; flex-shrink: 0;
 }
 .ai-back-btn:hover { background: var(--surface2); color: var(--text); }
-.ai-reading-date { font-size: 12px; color: var(--text3); }
+.ai-reading-date { font-size: 13px; color: var(--text3); }
 .ai-cancel-btn {
   padding: 3px 10px; border: 1px solid var(--border2);
   background: transparent; color: var(--text2); border-radius: 5px;
-  font-size: 11px; cursor: pointer; transition: background 0.1s;
+  font-size: 12px; cursor: pointer; transition: background 0.1s;
 }
 .ai-cancel-btn:hover { background: var(--surface2); color: var(--text); }
 
 .ai-reading-context {
-  font-size: 11px; color: var(--text3); font-style: italic;
+  font-size: 12px; color: var(--text3); font-style: italic;
   padding: 6px 16px; border-bottom: 1px solid var(--border);
   background: var(--surface); flex-shrink: 0;
 }
@@ -122,7 +122,7 @@ function onNotesInput() {
   display: flex; flex-wrap: wrap; gap: 4px; background: var(--surface);
 }
 .ai-toc-item {
-  font-size: 11px; color: var(--text3); padding: 2px 9px;
+  font-size: 12px; color: var(--text3); padding: 2px 9px;
   border-radius: 10px; background: var(--surface2); border: 1px solid var(--border);
   cursor: pointer; transition: color 0.1s, background 0.1s, border-color 0.1s;
   white-space: nowrap; text-decoration: none; display: inline-block;
@@ -133,16 +133,16 @@ function onNotesInput() {
   flex: 1; overflow-y: auto; padding: 16px 20px; min-height: 0; user-select: text;
 }
 .ai-output-area :deep(h1), .ai-output-area :deep(h2), .ai-output-area :deep(h3) { color: var(--text); margin: 16px 0 8px; line-height: 1.3; }
-.ai-output-area :deep(h1) { font-size: 16px; }
-.ai-output-area :deep(h2) { font-size: 14px; }
-.ai-output-area :deep(h3) { font-size: 13px; color: var(--text2); }
-.ai-output-area :deep(p)  { font-size: 13px; line-height: 1.6; color: var(--text2); margin-bottom: 10px; }
+.ai-output-area :deep(h1) { font-size: 18px; }
+.ai-output-area :deep(h2) { font-size: 16px; }
+.ai-output-area :deep(h3) { font-size: 15px; color: var(--text2); }
+.ai-output-area :deep(p)  { font-size: 14px; line-height: 1.6; color: var(--text2); margin-bottom: 10px; }
 .ai-output-area :deep(strong) { color: var(--text); }
-.ai-output-area :deep(code) { font-family: 'Cascadia Code','Fira Code',monospace; font-size: 11px; background: var(--surface2); border: 1px solid var(--border); border-radius: 4px; padding: 1px 5px; color: #58a6ff; }
+.ai-output-area :deep(code) { font-family: 'Cascadia Code','Fira Code',monospace; font-size: 12px; background: var(--surface2); border: 1px solid var(--border); border-radius: 4px; padding: 1px 5px; color: #58a6ff; }
 .ai-output-area :deep(pre) { background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; padding: 12px; overflow-x: auto; margin-bottom: 12px; }
-.ai-output-area :deep(pre code) { background: none; border: none; padding: 0; font-size: 12px; color: var(--text); }
+.ai-output-area :deep(pre code) { background: none; border: none; padding: 0; font-size: 13px; color: var(--text); }
 .ai-output-area :deep(ul), .ai-output-area :deep(ol) { padding-left: 20px; margin-bottom: 10px; }
-.ai-output-area :deep(li)  { font-size: 13px; line-height: 1.6; color: var(--text2); margin-bottom: 3px; }
+.ai-output-area :deep(li)  { font-size: 14px; line-height: 1.6; color: var(--text2); margin-bottom: 3px; }
 .ai-output-area :deep(hr)  { border: none; border-top: 1px solid var(--border); margin: 14px 0; }
 
 .ai-notes-section { flex-shrink: 0; }
@@ -150,19 +150,19 @@ function onNotesInput() {
   display: flex; align-items: center; gap: 8px;
   width: 100%; padding: 9px 16px; border: none; background: transparent;
   cursor: pointer; border-top: 1px solid var(--border);
-  font-size: 10px; font-weight: 700; text-transform: uppercase;
+  font-size: 11px; font-weight: 700; text-transform: uppercase;
   letter-spacing: 0.06em; color: var(--text3); transition: color 0.1s;
 }
 .ai-notes-toggle:hover { color: var(--text2); }
 .ai-notes-toggle svg { width: 10px; height: 10px; margin-left: auto; transition: transform 0.15s; flex-shrink: 0; }
 .ai-notes-toggle.open svg { transform: rotate(180deg); }
-.ai-notes-saved { font-size: 10px; color: var(--green); font-weight: 400; text-transform: none; letter-spacing: 0; }
+.ai-notes-saved { font-size: 11px; color: var(--green); font-weight: 400; text-transform: none; letter-spacing: 0; }
 
 .ai-notes-body { padding: 0 16px 12px; flex-shrink: 0; }
 .ai-notes-textarea {
   width: 100%; min-height: 70px; max-height: 130px;
   background: var(--surface); border: 1px solid var(--border2); border-radius: 7px;
-  color: var(--text); font-size: 12px; padding: 8px 11px; resize: vertical;
+  color: var(--text); font-size: 13px; padding: 8px 11px; resize: vertical;
   outline: none; font-family: inherit; line-height: 1.5;
   transition: border-color 0.15s; user-select: text;
 }

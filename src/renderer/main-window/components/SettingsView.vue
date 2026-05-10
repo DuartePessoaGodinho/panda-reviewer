@@ -217,10 +217,10 @@ async function onSave() {
   padding: 14px 20px; border-bottom: 1px solid var(--border);
   background: var(--surface); flex-shrink: 0;
 }
-.settings-title { font-size: 14px; font-weight: 700; color: var(--text); }
+.settings-title { font-size: 16px; font-weight: 700; color: var(--text); }
 .settings-close {
   width: 26px; height: 26px; border: none; background: transparent;
-  color: var(--text3); cursor: pointer; border-radius: 5px; font-size: 13px;
+  color: var(--text3); cursor: pointer; border-radius: 5px; font-size: 14px;
   display: flex; align-items: center; justify-content: center;
   transition: background 0.1s, color 0.1s;
 }
@@ -230,32 +230,32 @@ async function onSave() {
 
 .setting-section { display: flex; flex-direction: column; gap: 8px; }
 .setting-label {
-  font-size: 11px; font-weight: 700; color: var(--text2);
+  font-size: 12px; font-weight: 700; color: var(--text2);
   text-transform: uppercase; letter-spacing: 0.05em;
   display: flex; align-items: center; gap: 8px;
 }
 .setting-description {
   color: var(--text3);
-  font-size: 11px;
+  font-size: 13px;
   line-height: 1.45;
   max-width: 760px;
   user-select: none;
 }
 .setting-value { margin-left: auto; font-weight: 400; color: var(--text3); text-transform: none; letter-spacing: 0; }
-.setting-link  { margin-left: auto; font-size: 11px; color: var(--accent); cursor: pointer; font-weight: 400; text-transform: none; letter-spacing: 0; }
+.setting-link  { margin-left: auto; font-size: 12px; color: var(--accent); cursor: pointer; font-weight: 400; text-transform: none; letter-spacing: 0; }
 .setting-link:hover { text-decoration: underline; }
 
 .setting-input {
   width: 100%; padding: 8px 10px; border-radius: 6px;
   border: 1px solid var(--border2); background: var(--surface);
-  color: var(--text); font-size: 12px; outline: none;
+  color: var(--text); font-size: 13px; outline: none;
   font-family: monospace; transition: border-color 0.15s;
 }
 .setting-input:focus  { border-color: var(--accent-border); }
 .setting-input.valid  { border-color: var(--green); }
 .setting-input.invalid{ border-color: var(--red); }
 
-.token-status { font-size: 11px; padding: 2px 0; }
+.token-status { font-size: 12px; padding: 2px 0; }
 .token-status.ok      { color: var(--green); }
 .token-status.err     { color: var(--red); }
 .token-status.loading { color: var(--text3); }
@@ -267,7 +267,7 @@ async function onSave() {
 .path-row .setting-input { flex: 1; }
 
 .btn-add {
-  margin-left: auto; font-size: 10px; padding: 3px 8px;
+  margin-left: auto; font-size: 11px; padding: 3px 8px;
   border-radius: 5px; border: 1px solid var(--border2);
   background: transparent; color: var(--accent); cursor: pointer;
   font-weight: 600; text-transform: none; letter-spacing: 0;
@@ -279,7 +279,7 @@ async function onSave() {
   width: 28px; height: 28px; border: 1px solid var(--border2);
   background: var(--surface); color: var(--text2); border-radius: 5px;
   cursor: pointer; display: flex; align-items: center; justify-content: center;
-  font-size: 13px; flex-shrink: 0; transition: background 0.1s;
+  font-size: 14px; flex-shrink: 0; transition: background 0.1s;
 }
 .btn-icon:hover       { background: var(--surface2); }
 .btn-icon.danger:hover{ border-color: var(--red); color: var(--red); }
@@ -289,12 +289,12 @@ async function onSave() {
 .option-btn {
   padding: 10px 8px; border-radius: 8px; border: 1px solid var(--border2);
   background: var(--surface); color: var(--text2); cursor: pointer;
-  font-size: 12px; font-weight: 500; display: flex; align-items: center;
+  font-size: 13px; font-weight: 500; display: flex; align-items: center;
   gap: 6px; transition: background 0.1s, border-color 0.1s, color 0.1s;
 }
 .option-btn:hover    { background: var(--surface2); color: var(--text); }
 .option-btn.selected { background: var(--accent-bg); border-color: var(--accent-border); color: #58a6ff; font-weight: 700; }
-.option-icon { font-size: 14px; }
+.option-icon { font-size: 15px; }
 
 /* Toggle switch */
 .toggle { display: inline-flex; align-items: center; cursor: pointer; margin-left: auto; }
@@ -321,7 +321,7 @@ async function onSave() {
 }
 .btn-cancel {
   padding: 7px 16px; border-radius: 6px; border: 1px solid var(--border2);
-  background: transparent; color: var(--text2); font-size: 13px; cursor: pointer;
+  background: transparent; color: var(--text2); font-size: 14px; cursor: pointer;
   transition: background 0.1s;
 }
 .btn-cancel:hover { background: var(--surface2); }
@@ -329,7 +329,7 @@ async function onSave() {
   padding: 7px 20px; border-radius: 6px;
   border: 1px solid var(--accent-border);
   background: var(--accent-bg); color: #58a6ff;
-  font-size: 13px; font-weight: 600; cursor: pointer; min-width: 80px;
+  font-size: 14px; font-weight: 600; cursor: pointer; min-width: 80px;
   transition: background 0.12s;
 }
 .btn-save:hover  { background: #1f3a5a; }

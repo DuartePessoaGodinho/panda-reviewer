@@ -48,7 +48,7 @@ body {
   overflow: hidden;
   user-select: none;
   -webkit-font-smoothing: antialiased;
-  font-size: 13px;
+  font-size: 14px;
   letter-spacing: -0.005em;
 }
 
@@ -77,7 +77,7 @@ body {
   background: transparent;
   color: var(--text3);
   font-family: var(--font-ui);
-  font-size: 11px;
+  font-size: 12.5px;
   font-weight: 500;
   cursor: pointer;
   display: flex;
@@ -127,7 +127,7 @@ body {
 
 /* ── Badges ── */
 .badge {
-  font-size: 9px;
+  font-size: 10px;
   font-weight: 600;
   padding: 2px 5px;
   border-radius: 3px;
@@ -146,6 +146,7 @@ body {
 .badge.pipeline-run { background: rgba(201,154,13,0.12);  color: var(--yellow); }
 .badge.approved     { background: rgba(23,207,139,0.08);  color: var(--green);  }
 .badge.comments     { background: var(--surface2);        color: var(--text2);  }
+.badge.pinned       { background: rgba(201,154,13,0.12);  color: var(--yellow); }
 
 /* ── Toast notifications ── */
 .toast-container {
@@ -160,7 +161,7 @@ body {
   border: 1px solid var(--border2);
   border-radius: 8px;
   padding: 10px 14px;
-  font-size: 12px;
+  font-size: 13px;
   color: var(--text);
   display: flex; align-items: center; gap: 8px;
   box-shadow: 0 8px 32px rgba(0,0,0,0.55);
@@ -211,8 +212,8 @@ body {
   box-shadow: 0 24px 64px rgba(0,0,0,0.65);
 }
 .dialog-icon { font-size: 22px; margin-bottom: 14px; }
-.dialog h3   { font-size: 14px; font-weight: 600; margin-bottom: 6px; letter-spacing: -0.02em; }
-.dialog p    { font-size: 12px; color: var(--text2); margin-bottom: 18px; line-height: 1.65; }
+.dialog h3   { font-size: 16px; font-weight: 600; margin-bottom: 6px; letter-spacing: -0.02em; }
+.dialog p    { font-size: 13px; color: var(--text2); margin-bottom: 18px; line-height: 1.65; }
 
 .clone-cmd {
   background: var(--bg);
@@ -220,7 +221,7 @@ body {
   border-radius: 7px;
   padding: 12px 14px;
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: 12px;
   color: var(--accent);
   word-break: break-all;
   margin-bottom: 18px;
@@ -236,7 +237,7 @@ body {
   background: var(--surface2);
   color: var(--text2);
   font-family: var(--font-ui);
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 500;
   cursor: pointer;
   transition: background 0.12s, color 0.12s;
@@ -264,5 +265,5 @@ body {
   font-size: 20px; margin-bottom: 4px;
   border: 1px solid var(--border);
 }
-.empty-title { font-size: 13px; font-weight: 600; color: var(--text2); letter-spacing: -0.02em; }
-.empty-sub   { font-size: 11px; color: var(--text3); line-height: 1.65; }
+.empty-title { font-size: 14px; font-weight: 600; color: var(--text2); letter-spacing: -0.02em; }
+.empty-sub   { font-size: 12px; color: var(--text3); line-height: 1.65; }

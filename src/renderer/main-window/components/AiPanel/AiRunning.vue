@@ -2,7 +2,7 @@
   <div class="ai-panel">
     <div class="ai-running-header">
       <div class="ai-status-dot running"></div>
-      <span style="color:var(--text2);font-size:13px;">{{ providerLabel }} review in progress</span>
+      <span style="color:var(--text2);font-size:14px;">{{ providerLabel }} review in progress</span>
       <button class="ai-cancel-btn" style="margin-left:auto" @click="$emit('cancel')">■ Stop</button>
     </div>
 
@@ -69,7 +69,7 @@ defineEmits<{ cancel: [] }>();
 .ai-cancel-btn {
   padding: 3px 10px; border: 1px solid var(--border2);
   background: transparent; color: var(--text2); border-radius: 5px;
-  font-size: 11px; cursor: pointer; transition: background 0.1s;
+  font-size: 12px; cursor: pointer; transition: background 0.1s;
 }
 .ai-cancel-btn:hover { background: var(--surface2); color: var(--text); }
 
@@ -209,12 +209,12 @@ defineEmits<{ cancel: [] }>();
 
 /* Text block */
 .ai-running-copy { width: min(440px, 100%); text-align: center; z-index: 1; }
-.ai-running-copy h2 { margin: 0 0 8px; font-size: 18px; line-height: 1.25; color: var(--text); }
-.ai-running-copy p  { margin: 0 auto 14px; max-width: 390px; font-size: 12px; line-height: 1.55; color: var(--text3); }
+.ai-running-copy h2 { margin: 0 0 8px; font-size: 20px; line-height: 1.25; color: var(--text); }
+.ai-running-copy p  { margin: 0 auto 14px; max-width: 390px; font-size: 13px; line-height: 1.55; color: var(--text3); }
 
 .ai-review-steps {
   position: relative; height: 22px; color: #fbbf24;
-  font-size: 11px; font-weight: 700; overflow: hidden;
+  font-size: 12px; font-weight: 700; overflow: hidden;
 }
 .ai-review-steps span {
   position: absolute; inset: 0; opacity: 0; transform: translateY(10px);

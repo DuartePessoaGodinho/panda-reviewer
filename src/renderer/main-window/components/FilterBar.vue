@@ -86,7 +86,7 @@ const approvalOptions: { value: ApprovalFilter; label: string }[] = [
 /* Filter chips */
 .fb-chip {
   font-family: var(--font-ui);
-  font-size: 10.5px;
+  font-size: 12px;
   font-weight: 500;
   padding: 3px 9px;
   border-radius: 5px;
@@ -137,7 +137,7 @@ const approvalOptions: { value: ApprovalFilter; label: string }[] = [
 
 .fb-select {
   font-family: var(--font-ui);
-  font-size: 10.5px;
+  font-size: 12px;
   font-weight: 500;
   padding: 3px 7px 3px 22px;
   border-radius: 5px;
@@ -159,7 +159,7 @@ const approvalOptions: { value: ApprovalFilter; label: string }[] = [
 .fb-clear {
   margin-left: auto;
   font-family: var(--font-ui);
-  font-size: 10.5px;
+  font-size: 12px;
   font-weight: 500;
   padding: 3px 9px;
   border-radius: 5px;

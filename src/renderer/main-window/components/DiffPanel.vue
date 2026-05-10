@@ -219,7 +219,7 @@ watch(
   justify-content: center;
   height: 100%;
   color: var(--text3);
-  font-size: 12px;
+  font-size: 13px;
   flex-direction: column;
   gap: 10px;
 }
@@ -236,13 +236,13 @@ watch(
 }
 .diff-placeholder-icon.loading svg { animation: spin 0.9s linear infinite; }
 .diff-placeholder-title {
-  font-size: 13px;
+  font-size: 15px;
   font-weight: 600;
   color: var(--text2);
   letter-spacing: -0.015em;
 }
 .diff-placeholder p {
-  font-size: 11.5px;
+  font-size: 13px;
   color: var(--text3);
   text-align: center;
   line-height: 1.6;
@@ -271,7 +271,7 @@ watch(
   background: rgba(255,255,255,0.018);
   color: var(--text3);
   font-family: var(--font-ui);
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 600;
   cursor: pointer;
   display: flex;
@@ -348,7 +348,7 @@ watch(
   text-overflow: ellipsis;
   white-space: nowrap;
   color: var(--text);
-  font-size: 12.5px;
+  font-size: 14px;
   font-weight: 600;
   letter-spacing: -0.02em;
 }
@@ -378,7 +378,7 @@ watch(
 
 .diff-stat-value {
   font-family: var(--font-mono);
-  font-size: 12px;
+  font-size: 13px;
   line-height: 1;
   font-weight: 700;
   color: var(--text);
@@ -386,7 +386,7 @@ watch(
 }
 
 .diff-stat-label {
-  font-size: 9px;
+  font-size: 10px;
   line-height: 1;
   font-weight: 600;
   color: var(--text3);
@@ -487,7 +487,7 @@ watch(
   padding: 3px 7px !important;
   border-radius: 5px !important;
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 700;
   line-height: 1;
   text-align: center;
@@ -518,7 +518,7 @@ watch(
   background: var(--surface) !important;
   border-color: var(--border) !important;
   color: var(--text2) !important;
-  font-size: 11.5px !important;
+  font-size: 12.5px !important;
   font-family: var(--font-mono) !important;
 }
 .diff-content :deep(.d2h-file-name),
@@ -592,7 +592,7 @@ watch(
   background: var(--bg) !important;
   color: var(--text2) !important;
   font-family: var(--font-mono);
-  font-size: 12px;
+  font-size: 13px;
   line-height: 1.4;
 }
 .diff-content :deep(.d2h-diff-tbody) { background: var(--bg) !important; }

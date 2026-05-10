@@ -1,25 +1,64 @@
 import { defineStore } from 'pinia';
-import { ref, computed } from 'vue';
+import { ref, computed, reactive } from 'vue';
 import type { MR } from '../../types';
 import { useMrsStore } from './mrs';
 
 export type ApprovalFilter = 'all' | 'pending' | 'approved';
+export type TabKey = 'review' | 'mine' | 'pinned';
+interface FilterState {
+  approval: ApprovalFilter;
+  noComments: boolean;
+  hideDrafts: boolean;
+  author: string;
+}
+
+function defaultFilters(): FilterState {
+  return {
+    approval: 'all',
+    noComments: false,
+    hideDrafts: false,
+    author: 'all',
+  };
+}
 
 export const useFiltersStore = defineStore('filters', () => {
-  const activeTab = ref<'review' | 'mine'>('review');
-  const approval = ref<ApprovalFilter>('all');
-  const noComments = ref(false);
-  const hideDrafts = ref(false);
-  const author = ref('all');
+  const activeTab = ref<TabKey>('review');
+  const filtersByTab = reactive<Record<TabKey, FilterState>>({
+    review: defaultFilters(),
+    mine: defaultFilters(),
+    pinned: defaultFilters(),
+  });
 
   const mrs = useMrsStore();
+
+  const activeFilters = computed(() => filtersByTab[activeTab.value]);
+  const approval = computed({
+    get: () => activeFilters.value.approval,
+    set: value => { activeFilters.value.approval = value; },
+  });
+  const noComments = computed({
+    get: () => activeFilters.value.noComments,
+    set: value => { activeFilters.value.noComments = value; },
+  });
+  const hideDrafts = computed({
+    get: () => activeFilters.value.hideDrafts,
+    set: value => { activeFilters.value.hideDrafts = value; },
+  });
+  const author = computed({
+    get: () => activeFilters.value.author,
+    set: value => { activeFilters.value.author = value; },
+  });
 
   function isDraft(mr: MR): boolean {
     return mr.title?.startsWith('Draft:') || mr.title?.startsWith('WIP:') || mr.work_in_progress;
   }
 
   const sourceMrs = computed(() =>
-    activeTab.value === 'review' ? mrs.toReviewMrs : mrs.myMrs
+    activeTab.value === 'review'
+      ? mrs.toReviewMrs
+      : activeTab.value === 'mine'
+        ? mrs.myMrs
+        : mrs.pinnedMrs
   );
 
   const uniqueAuthors = computed(() => {
@@ -30,29 +69,27 @@ export const useFiltersStore = defineStore('filters', () => {
 
   const filteredMrs = computed(() =>
     sourceMrs.value.filter(mr => {
-      if (approval.value === 'pending' && mrs.approvedByMe(mr)) return false;
-      if (approval.value === 'approved' && !mrs.approvedByMe(mr)) return false;
-      if (noComments.value && mr.user_notes_count > 0) return false;
-      if (hideDrafts.value && isDraft(mr)) return false;
-      if (author.value !== 'all' && mr.author.username !== author.value) return false;
+      const current = activeFilters.value;
+      if (current.approval === 'pending' && mrs.approvedByMe(mr)) return false;
+      if (current.approval === 'approved' && !mrs.approvedByMe(mr)) return false;
+      if (current.noComments && mr.user_notes_count > 0) return false;
+      if (current.hideDrafts && isDraft(mr)) return false;
+      if (current.author !== 'all' && mr.author.username !== current.author) return false;
       return true;
     })
   );
 
-  const isAnyActive = computed(() =>
-    approval.value !== 'all' || noComments.value || hideDrafts.value || author.value !== 'all'
-  );
+  const isAnyActive = computed(() => {
+    const current = activeFilters.value;
+    return current.approval !== 'all' || current.noComments || current.hideDrafts || current.author !== 'all';
+  });
 
   function reset() {
-    approval.value = 'all';
-    noComments.value = false;
-    hideDrafts.value = false;
-    author.value = 'all';
+    Object.assign(activeFilters.value, defaultFilters());
   }
 
-  function switchTab(tab: 'review' | 'mine') {
+  function switchTab(tab: TabKey) {
     activeTab.value = tab;
-    reset();
   }
 
   return {

@@ -31,6 +31,12 @@
             <span v-if="pipelineStatus === 'failed'"  class="badge pipeline-fail">✗ CI</span>
             <span v-if="pipelineStatus === 'running' || pipelineStatus === 'pending'" class="badge pipeline-run">⟳ CI</span>
             <span v-if="approved" class="badge approved">✓ Approved</span>
+            <span v-if="pinned" class="badge pinned">
+              <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+                <path d="M9.8 1.1a.5.5 0 0 1 .35.15l4.6 4.6a.5.5 0 0 1-.35.85h-1.8l-2 2a1 1 0 0 0-.3.7v1.65a1 1 0 0 1-1.7.7L7 10.15l-3.65 3.7a.5.5 0 0 1-.7-.7L6.3 9.45 4.7 7.85a1 1 0 0 1 .7-1.7h1.65a1 1 0 0 0 .7-.3l2-2V1.6a.5.5 0 0 1 .05-.5Z"/>
+              </svg>
+              Pinned
+            </span>
             <span v-if="mr.user_notes_count > 0" class="badge comments" :title="`${mr.user_notes_count} comment${mr.user_notes_count !== 1 ? 's' : ''}`">
               <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
                 <path d="M2 3.5A2.5 2.5 0 0 1 4.5 1h7A2.5 2.5 0 0 1 14 3.5v4A2.5 2.5 0 0 1 11.5 10H7.9l-3.2 2.4A.45.45 0 0 1 4 12.04V10A2 2 0 0 1 2 8V3.5Z"/>
@@ -73,6 +79,17 @@
         </svg>
         AI Review
       </button>
+      <button
+        class="btn-sm pin-btn"
+        :class="{ active: pinned }"
+        :title="pinned ? 'Unpin MR' : 'Pin MR'"
+        :aria-pressed="pinned"
+        @click="$emit('toggle-pin', mr)"
+      >
+        <svg width="11" height="11" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+          <path d="M9.8 1.1a.5.5 0 0 1 .35.15l4.6 4.6a.5.5 0 0 1-.35.85h-1.8l-2 2a1 1 0 0 0-.3.7v1.65a1 1 0 0 1-1.7.7L7 10.15l-3.65 3.7a.5.5 0 0 1-.7-.7L6.3 9.45 4.7 7.85a1 1 0 0 1 .7-1.7h1.65a1 1 0 0 0 .7-.3l2-2V1.6a.5.5 0 0 1 .05-.5Z"/>
+        </svg>
+      </button>
       <button class="btn-sm ide-btn" title="Open in IDE" @click="$emit('open-in-ide', mr)">
         <svg width="11" height="11" viewBox="0 0 16 16" fill="currentColor">
           <path d="M14 1a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1h12zM2 0a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V2a2 2 0 0 0-2-2H2z"/>
@@ -101,6 +118,7 @@ const props = defineProps<{
   index: number;
   isActive: boolean;
   approved: boolean;
+  pinned: boolean;
   hasRepo: boolean;
   aiEnabled: boolean;
 }>();
@@ -110,6 +128,7 @@ defineEmits<{
   'ai-review': [mr: MR];
   'open-in-ide': [mr: MR];
   approve: [mr: MR];
+  'toggle-pin': [mr: MR];
   'open-external': [url: string];
 }>();
 
@@ -214,7 +233,7 @@ const aiDisabledTitle = computed(() => {
 }
 
 .mr-title {
-  font-size: 12.5px;
+  font-size: 14px;
   font-weight: 600;
   color: var(--text);
   line-height: 1.45;
@@ -226,7 +245,7 @@ const aiDisabledTitle = computed(() => {
 }
 
 .mr-author {
-  font-size: 11px;
+  font-size: 12.5px;
   color: var(--text2);
   margin-top: 3px;
   overflow: hidden;
@@ -249,7 +268,7 @@ const aiDisabledTitle = computed(() => {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  font-size: 10px;
+  font-size: 11.5px;
   background: var(--bg);
   color: var(--text3);
   border: 1px solid var(--border);
@@ -269,7 +288,7 @@ const aiDisabledTitle = computed(() => {
   text-overflow: ellipsis;
 }
 
-.branch-arrow { color: var(--text3); font-size: 10px; flex-shrink: 0; }
+.branch-arrow { color: var(--text3); font-size: 11px; flex-shrink: 0; }
 
 .mr-times {
   display: grid;
@@ -279,7 +298,7 @@ const aiDisabledTitle = computed(() => {
 }
 
 .mr-time {
-  font-size: 10px;
+  font-size: 11.5px;
   color: var(--text3);
   white-space: nowrap;
   font-family: var(--font-mono);
@@ -288,7 +307,7 @@ const aiDisabledTitle = computed(() => {
 /* Action buttons */
 .card-actions {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 33px 33px;
+  grid-template-columns: minmax(0, 1fr) 33px 33px 33px;
   gap: 5px;
   margin-top: 10px;
   padding-top: 10px;
@@ -297,7 +316,17 @@ const aiDisabledTitle = computed(() => {
   transition: opacity 0.15s;
 }
 .card-actions.has-approve {
-  grid-template-columns: minmax(0, 1fr) 33px minmax(92px, 0.8fr) 33px;
+  grid-template-columns: minmax(0, 1fr) 33px 33px minmax(92px, 0.8fr) 33px;
 }
 .mr-card:hover .card-actions { opacity: 1; }
+
+.pin-btn {
+  flex: 0;
+  padding: 5px 7px;
+}
+.pin-btn.active {
+  background: rgba(201,154,13,0.12);
+  border-color: rgba(201,154,13,0.35);
+  color: var(--yellow);
+}
 </style>

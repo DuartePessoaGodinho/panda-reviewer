@@ -54,8 +54,11 @@
               <svg v-if="tab.key === 'review'" viewBox="0 0 16 16" fill="currentColor">
                 <path d="M2.678 11.894a1 1 0 0 1 .287.801 10.97 10.97 0 0 1-.398 2c1.395-.323 2.247-.697 2.634-.893a1 1 0 0 1 .71-.074A8.06 8.06 0 0 0 8 14c3.996 0 7-2.807 7-6 0-3.192-3.004-6-7-6S1 4.808 1 8c0 1.468.617 2.83 1.678 3.894zm-.493 3.905a21.682 21.682 0 0 1-.713.129c-.2.032-.352-.176-.273-.362a9.68 9.68 0 0 0 .244-.637l.003-.01c.248-.72.45-1.548.524-2.319C.743 11.37 0 9.76 0 8c0-3.866 3.582-7 8-7s8 3.134 8 7-3.582 7-8 7a9.06 9.06 0 0 1-2.347-.306c-.52.263-1.639.742-3.468 1.105z"/>
               </svg>
-              <svg v-else viewBox="0 0 16 16" fill="currentColor">
+              <svg v-else-if="tab.key === 'mine'" viewBox="0 0 16 16" fill="currentColor">
                 <path d="M6 8a3 3 0 1 0 0-6 3 3 0 0 0 0 6zm2-3a2 2 0 1 1-4 0 2 2 0 0 1 4 0zm4 8c0 1-1 1-1 1H1s-1 0-1-1 1-4 6-4 6 3 6 4zm-1-.004c-.001-.246-.154-.986-.832-1.664C9.516 10.68 8.289 10 6 10c-2.29 0-3.516.68-4.168 1.332-.678.678-.83 1.418-.832 1.664h10z"/>
+              </svg>
+              <svg v-else viewBox="0 0 16 16" fill="currentColor">
+                <path d="M9.828.722a.5.5 0 0 1 .354.146l4.95 4.95a.5.5 0 0 1-.354.854h-1.944l-2.121 2.121a1 1 0 0 0-.293.707v1.793a1 1 0 0 1-1.707.707L6.97 10.257l-3.616 3.617a.5.5 0 0 1-.708-.708L6.263 9.55 4.52 7.807a1 1 0 0 1 .707-1.707H7.02a1 1 0 0 0 .707-.293L9.85 3.686V1.222a.5.5 0 0 1 .5-.5h-.522zm.729 1.707v1.464a.5.5 0 0 1-.146.354L8.434 6.223A2 2 0 0 1 7.02 6.81H5.227l4.486 4.486V9.5a2 2 0 0 1 .586-1.414l1.975-1.975a.5.5 0 0 1 .354-.146h.943l-3.014-3.536z"/>
               </svg>
             </span>
             <span class="tab-label">{{ tab.label }}</span>
@@ -125,6 +128,7 @@ import { ref, computed, onMounted } from 'vue';
 import type { MR } from '../types';
 import { useMrsStore } from './stores/mrs';
 import { useFiltersStore } from './stores/filters';
+import type { TabKey } from './stores/filters';
 import { useAiStore } from './stores/ai';
 import { projectUrl } from './utils';
 import MrList from './components/MrList.vue';
@@ -159,8 +163,9 @@ const providerLabel = computed(() => {
 });
 
 const tabs = computed(() => [
-  { key: 'review' as const, icon: '👀', label: 'To Review', count: mrs.toReviewMrs.length },
-  { key: 'mine'   as const, icon: '🔀', label: 'My MRs',    count: mrs.myMrs.length },
+  { key: 'review' as const, label: 'To Review', count: mrs.toReviewMrs.length },
+  { key: 'mine'   as const, label: 'My MRs',    count: mrs.myMrs.length },
+  { key: 'pinned' as const, label: 'Pinned',    count: mrs.pinnedMrs.length },
 ]);
 
 function showToast(msg: string, type: Toast['type'] = 'info', duration = 3000) {
@@ -186,7 +191,7 @@ function toggleSidebar() {
 function minimizeWindow() { window.api.minimizeWindow(); }
 function closeWindow()    { window.api.closeWindow(); }
 
-function switchTab(tab: 'review' | 'mine') {
+function switchTab(tab: TabKey) {
   filters.switchTab(tab);
   mrs.setActiveMr(null);
 }
@@ -317,7 +322,7 @@ onMounted(async () => {
 }
 
 .app-name {
-  font-size: 12.5px;
+  font-size: 14px;
   font-weight: 600;
   color: var(--text2);
   letter-spacing: -0.02em;
@@ -331,7 +336,7 @@ onMounted(async () => {
 }
 
 .last-updated {
-  font-size: 10px;
+  font-size: 11px;
   color: var(--text3);
   margin-right: 6px;
   font-family: var(--font-mono);
@@ -443,7 +448,7 @@ onMounted(async () => {
   color: var(--text3);
   cursor: pointer;
   font-family: var(--font-ui);
-  font-size: 12.5px;
+  font-size: 14px;
   font-weight: 500;
   text-align: left;
   width: 100%;
@@ -478,7 +483,7 @@ onMounted(async () => {
   margin-left: auto;
   background: var(--surface3);
   color: var(--text2);
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 600;
   border-radius: 5px;
   padding: 1px 6px;
@@ -500,7 +505,7 @@ onMounted(async () => {
 .sidebar.collapsed .tab-count  {
   position: absolute;
   top: 4px; right: 4px;
-  min-width: 14px; font-size: 8px; padding: 0 3px;
+  min-width: 15px; font-size: 9px; padding: 0 3px;
 }
 .sidebar.collapsed .tab-count.zero { display: none; }
 .sidebar.collapsed .settings-btn   { justify-content: center; padding: 9px 0; }
@@ -523,7 +528,7 @@ onMounted(async () => {
   gap: 8px;
   padding: 6px 10px;
   border-radius: 6px;
-  font-size: 10.5px;
+  font-size: 12px;
   color: var(--text3);
   font-family: var(--font-ui);
   letter-spacing: -0.01em;
@@ -551,7 +556,7 @@ onMounted(async () => {
   color: var(--text3);
   cursor: pointer;
   font-family: var(--font-ui);
-  font-size: 12.5px;
+  font-size: 14px;
   font-weight: 500;
   width: 100%;
   transition: background 0.12s, color 0.12s;

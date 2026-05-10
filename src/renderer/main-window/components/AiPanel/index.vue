@@ -98,6 +98,6 @@ function onRerun() {
 .ai-panel   { flex: 1; overflow: hidden; display: flex; flex-direction: column; min-height: 0; }
 .ai-hist-empty {
   display: flex; flex-direction: column; align-items: center; justify-content: center;
-  height: 100%; gap: 6px; color: var(--text3); font-size: 12px; text-align: center; padding: 20px;
+  height: 100%; gap: 6px; color: var(--text3); font-size: 13px; text-align: center; padding: 20px;
 }
 </style>

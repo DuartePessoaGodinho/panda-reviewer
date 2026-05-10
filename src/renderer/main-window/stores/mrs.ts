@@ -2,6 +2,24 @@ import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
 import type { MR } from '../../types';
 
+const PINNED_MRS_STORAGE_KEY = 'pinnedMrIds';
+
+function loadPinnedIds(): Set<number> {
+  try {
+    const raw = localStorage.getItem(PINNED_MRS_STORAGE_KEY);
+    if (!raw) return new Set();
+    const ids = JSON.parse(raw);
+    if (!Array.isArray(ids)) return new Set();
+    return new Set(ids.filter((id): id is number => Number.isInteger(id)));
+  } catch {
+    return new Set();
+  }
+}
+
+function savePinnedIds(ids: Set<number>) {
+  localStorage.setItem(PINNED_MRS_STORAGE_KEY, JSON.stringify([...ids]));
+}
+
 export const useMrsStore = defineStore('mrs', () => {
   const toReviewMrs = ref<MR[]>([]);
   const myMrs = ref<MR[]>([]);
@@ -10,8 +28,11 @@ export const useMrsStore = defineStore('mrs', () => {
   const currentUserId = ref<number | null>(null);
   const locallyApproved = ref(new Set<number>());
   const repoCache = ref<Record<number, string | null>>({});
+  const pinnedMrIds = ref(loadPinnedIds());
 
   const allMrs = computed(() => [...toReviewMrs.value, ...myMrs.value]);
+  const uniqueOpenMrs = computed(() => [...new Map(allMrs.value.map(mr => [mr.id, mr])).values()]);
+  const pinnedMrs = computed(() => uniqueOpenMrs.value.filter(mr => pinnedMrIds.value.has(mr.id)));
 
   function approvedByMe(mr: MR): boolean {
     if (locallyApproved.value.has(mr.id)) return true;
@@ -25,6 +46,19 @@ export const useMrsStore = defineStore('mrs', () => {
 
   function markApproved(mrId: number) {
     locallyApproved.value.add(mrId);
+  }
+
+  function isPinned(mr: MR): boolean {
+    return pinnedMrIds.value.has(mr.id);
+  }
+
+  function togglePinned(mr: MR) {
+    if (pinnedMrIds.value.has(mr.id)) {
+      pinnedMrIds.value.delete(mr.id);
+    } else {
+      pinnedMrIds.value.add(mr.id);
+    }
+    savePinnedIds(pinnedMrIds.value);
   }
 
   function setActiveMr(mr: MR | null) {
@@ -53,10 +87,15 @@ export const useMrsStore = defineStore('mrs', () => {
     currentUserId,
     locallyApproved,
     repoCache,
+    pinnedMrIds,
     allMrs,
+    uniqueOpenMrs,
+    pinnedMrs,
     approvedByMe,
     findById,
     markApproved,
+    isPinned,
+    togglePinned,
     setActiveMr,
     setActivePanelTab,
     update,
