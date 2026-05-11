@@ -175,7 +175,7 @@
               :style="{ top: `${inlineDraft.top}px`, left: `${inlineDraft.left}px` }"
             >
               <div class="inline-comment-title">
-                {{ inlineDraft.label }}
+                <span class="inline-comment-title-label">{{ inlineDraft.label }}</span>
                 <button type="button" @click="cancelInlineDraft">×</button>
               </div>
               <textarea
@@ -252,6 +252,7 @@ const isCompact = ref(false);
 const comments = useCommentsStore();
 const currentChanges = ref<any[]>([]);
 const currentCombinedDiff = ref('');
+const currentPositionLookup = ref<Map<string, DiffLinePosition>>(new Map());
 const diffContentRef = ref<HTMLElement | null>(null);
 const inlineBody = ref('');
 const inlineError = ref('');
@@ -265,6 +266,14 @@ const inlineDraft = ref<{
   new_line?: number;
 } | null>(null);
 let compactQuery: MediaQueryList | null = null;
+type DiffLinePosition = {
+  old_path: string;
+  new_path: string;
+  old_line?: number;
+  new_line?: number;
+  kind: 'old' | 'new' | 'context';
+  content: string;
+};
 const changedLines = computed(() => diffStats.value.added + diffStats.value.deleted);
 const currentSha = computed(() => mrs.activeMr?.sha ?? '');
 const commentState = computed(() => comments.getState(mrs.activeMr));
@@ -414,6 +423,49 @@ function formatInlineDiscussion(doc: Document, discussion: GitLabDiscussion) {
   return wrapper;
 }
 
+function positionLookupKey(side: 'old' | 'new', path: string, line?: number) {
+  return line ? `${side}:${path}:${line}` : '';
+}
+
+function extractDiffLinePositions(html: string, changes: any[]) {
+  const doc = new DOMParser().parseFromString(`<div>${html}</div>`, 'text/html');
+  const map = new Map<string, DiffLinePosition>();
+
+  doc.querySelectorAll('.d2h-file-wrapper').forEach((file, fileIndex) => {
+    const change = changes[fileIndex];
+    if (!change) return;
+
+    file.querySelectorAll('tbody tr').forEach((row) => {
+      const oldLine = row.querySelector('.line-num1')?.textContent?.trim();
+      const newLine = row.querySelector('.line-num2')?.textContent?.trim();
+      const codeCell = row.querySelector('td:nth-child(2)');
+      if (!codeCell || (!oldLine && !newLine) || codeCell.classList.contains('d2h-info')) return;
+
+      const oldLineNum = oldLine ? Number(oldLine) : undefined;
+      const newLineNum = newLine ? Number(newLine) : undefined;
+      const position: DiffLinePosition = {
+        old_path: change.old_path,
+        new_path: change.new_path,
+        old_line: oldLineNum,
+        new_line: newLineNum,
+        content: row.querySelector('.d2h-code-line-ctn')?.textContent ?? '',
+        kind: codeCell.classList.contains('d2h-ins')
+          ? 'new'
+          : codeCell.classList.contains('d2h-del')
+            ? 'old'
+            : 'context',
+      };
+
+      const newKey = positionLookupKey('new', change.new_path, newLineNum);
+      const oldKey = positionLookupKey('old', change.old_path, oldLineNum);
+      if (newKey) map.set(newKey, position);
+      if (oldKey) map.set(oldKey, position);
+    });
+  });
+
+  return map;
+}
+
 function decorateDiffHtml(html: string, changes: any[], discussions: GitLabDiscussion[]) {
   const doc = new DOMParser().parseFromString(`<div>${html}</div>`, 'text/html');
   const byPosition = discussionsByPosition(discussions);
@@ -430,28 +482,46 @@ function decorateDiffHtml(html: string, changes: any[], discussions: GitLabDiscu
 
       const oldLineNum = oldLine ? Number(oldLine) : undefined;
       const newLineNum = newLine ? Number(newLine) : undefined;
+      const lineContent = row.querySelector('.d2h-code-line-ctn')?.textContent ?? '';
       const kind = codeCell.classList.contains('d2h-ins')
         ? 'new'
         : codeCell.classList.contains('d2h-del')
           ? 'old'
           : 'context';
+      const mappedPosition = diffMode.value === 'new'
+        ? currentPositionLookup.value.get(positionLookupKey('new', change.new_path, newLineNum))
+          ?? currentPositionLookup.value.get(positionLookupKey('old', change.old_path, oldLineNum))
+        : null;
+      const commentPosition: DiffLinePosition | null = diffMode.value === 'new'
+        ? mappedPosition ?? null
+        : {
+          old_path: change.old_path,
+          new_path: change.new_path,
+          old_line: oldLineNum,
+          new_line: newLineNum,
+          content: lineContent,
+          kind,
+        };
+      if (mappedPosition && mappedPosition.content !== lineContent) {
+        row.setAttribute('title', 'This line is not commentable in the current MR diff');
+        return;
+      }
 
-      row.setAttribute('data-commentable-line', 'true');
-      row.setAttribute('data-old-path', change.old_path);
-      row.setAttribute('data-new-path', change.new_path);
-      row.setAttribute('data-line-kind', kind);
-      if (oldLineNum) row.setAttribute('data-old-line', String(oldLineNum));
-      if (newLineNum) row.setAttribute('data-new-line', String(newLineNum));
-      row.setAttribute('title', diffMode.value === 'new'
-        ? 'Inline comments are disabled in New changes view'
-        : 'Click to comment on this line');
+      if (commentPosition) {
+        row.setAttribute('data-commentable-line', 'true');
+        row.setAttribute('data-old-path', commentPosition.old_path);
+        row.setAttribute('data-new-path', commentPosition.new_path);
+        row.setAttribute('data-line-kind', commentPosition.kind);
+        if (commentPosition.old_line) row.setAttribute('data-old-line', String(commentPosition.old_line));
+        if (commentPosition.new_line) row.setAttribute('data-new-line', String(commentPosition.new_line));
+        row.setAttribute('title', 'Click to comment on this line');
+      } else if (diffMode.value === 'new') {
+        row.setAttribute('title', 'This line is not commentable in the current MR diff');
+      }
 
-      const rowDiscussions = byPosition.get(commentKey({
-        old_path: change.old_path,
-        new_path: change.new_path,
-        old_line: oldLineNum,
-        new_line: newLineNum,
-      }));
+      const rowDiscussions = commentPosition
+        ? byPosition.get(commentKey(commentPosition))
+        : undefined;
       if (!rowDiscussions?.length) return;
 
       const discussionRow = doc.createElement('tr');
@@ -528,7 +598,19 @@ async function loadDiff() {
       if (!checkpoint.value || !hasNewChanges.value) {
         diffMode.value = 'full';
       } else {
-        const { changes } = await window.api.getNewChangesDiff(mr.project_id, checkpoint.value.sourceSha, currentSha.value);
+        const [newChangesDiff, fullMrDiff] = await Promise.all([
+          window.api.getNewChangesDiff(mr.project_id, checkpoint.value.sourceSha, currentSha.value),
+          window.api.getMrDiff(mr.project_id, mr.iid),
+        ]);
+        const changes = newChangesDiff.changes;
+        const fullChanges = fullMrDiff.changes;
+        const fullCombinedDiff = fullDiffFromChanges(fullChanges);
+        const fullHtml = makeDiffFilesCollapsible(Diff2Html.html(fullCombinedDiff, {
+          drawFileList: true,
+          outputFormat: 'line-by-line',
+          renderNothingWhenEmpty: false,
+        }));
+        currentPositionLookup.value = extractDiffLinePositions(fullHtml, fullChanges);
         currentChanges.value = changes;
         currentCombinedDiff.value = fullDiffFromChanges(changes);
         renderDiff(currentCombinedDiff.value, changes);
@@ -537,6 +619,7 @@ async function loadDiff() {
     }
 
     const { changes } = await window.api.getMrDiff(mr.project_id, mr.iid);
+    currentPositionLookup.value = new Map();
     currentChanges.value = changes;
     currentCombinedDiff.value = fullDiffFromChanges(changes);
     renderDiff(currentCombinedDiff.value, changes);
@@ -600,10 +683,6 @@ function handleDiffContentKeydown(event: KeyboardEvent) {
 
 function openInlineDraft(row: HTMLElement) {
   inlineError.value = '';
-  if (diffMode.value === 'new') {
-    inlineError.value = 'Inline comments are disabled in New changes view.';
-    return;
-  }
 
   const wrapRect = row.closest('.diff-content-wrap')?.getBoundingClientRect();
   const rowRect = row.getBoundingClientRect();
@@ -1268,7 +1347,16 @@ onBeforeUnmount(() => {
   margin-bottom: 7px;
 }
 
+.inline-comment-title-label {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .inline-comment-title button {
+  flex: 0 0 22px;
   width: 22px;
   height: 22px;
   border: 1px solid var(--border);
