@@ -5,6 +5,7 @@ export interface GitLabUser {
   username: string;
   name: string;
   avatar_url: string;
+  web_url?: string;
 }
 
 export interface MergeRequest {
@@ -73,6 +74,52 @@ interface GitLabCompare {
   diffs: MrChanges['changes'];
 }
 
+export interface DiffPosition {
+  base_sha: string;
+  start_sha: string;
+  head_sha: string;
+  position_type: 'text';
+  old_path: string;
+  new_path: string;
+  old_line?: number;
+  new_line?: number;
+}
+
+export interface MergeRequestVersion {
+  id: number;
+  head_commit_sha: string;
+  base_commit_sha: string;
+  start_commit_sha: string;
+  created_at: string;
+  merge_request_id: number;
+  state: string;
+}
+
+export interface GitLabDiscussionNote {
+  id: number;
+  type: string | null;
+  body: string;
+  attachment?: string | null;
+  author: GitLabUser;
+  created_at: string;
+  updated_at: string;
+  system: boolean;
+  noteable_id: number;
+  noteable_type: string;
+  noteable_iid?: number | null;
+  project_id: number;
+  resolvable?: boolean;
+  resolved?: boolean;
+  resolved_by?: GitLabUser | null;
+  position?: DiffPosition | null;
+}
+
+export interface GitLabDiscussion {
+  id: string;
+  individual_note: boolean;
+  notes: GitLabDiscussionNote[];
+}
+
 export class GitLabService {
   private baseUrl: string;
   private token: string;
@@ -95,6 +142,34 @@ export class GitLabService {
     });
     if (!res.ok) throw new Error(`GitLab API ${res.status}: ${path}`);
     return res.json() as Promise<T>;
+  }
+
+  private async send<T>(
+    method: 'POST' | 'PUT',
+    path: string,
+    body?: Record<string, unknown>
+  ): Promise<T> {
+    const res = await net.fetch(`${this.baseUrl}${path}`, {
+      method,
+      headers: {
+        'PRIVATE-TOKEN': this.token,
+        'Content-Type': 'application/json',
+      },
+      body: body ? JSON.stringify(body) : undefined,
+    });
+    if (!res.ok) {
+      const text = await res.text().catch(() => '');
+      throw new Error(`GitLab API ${res.status}: ${path}${text ? ` - ${text}` : ''}`);
+    }
+    return res.json() as Promise<T>;
+  }
+
+  private async delete(path: string): Promise<void> {
+    const res = await net.fetch(`${this.baseUrl}${path}`, {
+      method: 'DELETE',
+      headers: { 'PRIVATE-TOKEN': this.token },
+    });
+    if (!res.ok) throw new Error(`GitLab API ${res.status}: ${path}`);
   }
 
   getCurrentUser(): Promise<GitLabUser> {
@@ -232,6 +307,82 @@ export class GitLabService {
       straight: 'true',
     });
     return { changes: compare.diffs ?? [] };
+  }
+
+  getMrDiscussions(projectId: number, mrIid: number): Promise<GitLabDiscussion[]> {
+    return this.get(`/projects/${projectId}/merge_requests/${mrIid}/discussions`, {
+      per_page: 100,
+    });
+  }
+
+  createMrComment(projectId: number, mrIid: number, body: string): Promise<GitLabDiscussion> {
+    return this.send('POST', `/projects/${projectId}/merge_requests/${mrIid}/discussions`, { body });
+  }
+
+  createDiffComment(
+    projectId: number,
+    mrIid: number,
+    position: DiffPosition,
+    body: string
+  ): Promise<GitLabDiscussion> {
+    return this.send('POST', `/projects/${projectId}/merge_requests/${mrIid}/discussions`, {
+      body,
+      position,
+    });
+  }
+
+  replyToDiscussion(
+    projectId: number,
+    mrIid: number,
+    discussionId: string,
+    body: string
+  ): Promise<GitLabDiscussionNote> {
+    return this.send(
+      'POST',
+      `/projects/${projectId}/merge_requests/${mrIid}/discussions/${discussionId}/notes`,
+      { body }
+    );
+  }
+
+  setDiscussionResolved(
+    projectId: number,
+    mrIid: number,
+    discussionId: string,
+    resolved: boolean
+  ): Promise<GitLabDiscussion> {
+    return this.send(
+      'PUT',
+      `/projects/${projectId}/merge_requests/${mrIid}/discussions/${discussionId}`,
+      { resolved }
+    );
+  }
+
+  updateDiscussionNote(
+    projectId: number,
+    mrIid: number,
+    discussionId: string,
+    noteId: number,
+    body: string
+  ): Promise<GitLabDiscussionNote> {
+    return this.send(
+      'PUT',
+      `/projects/${projectId}/merge_requests/${mrIid}/discussions/${discussionId}/notes/${noteId}`,
+      { body }
+    );
+  }
+
+  deleteDiscussionNote(projectId: number, mrIid: number, discussionId: string, noteId: number): Promise<void> {
+    return this.delete(`/projects/${projectId}/merge_requests/${mrIid}/discussions/${discussionId}/notes/${noteId}`);
+  }
+
+  async getLatestMrVersion(projectId: number, mrIid: number): Promise<MergeRequestVersion | null> {
+    const versions = await this.get<MergeRequestVersion[]>(
+      `/projects/${projectId}/merge_requests/${mrIid}/versions`,
+      { per_page: 20 }
+    );
+    return versions
+      .filter(version => version.base_commit_sha && version.start_commit_sha && version.head_commit_sha)
+      .sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at))[0] ?? null;
   }
 
   async approveMr(projectId: number, mrIid: number): Promise<void> {

@@ -11,7 +11,7 @@ import {
 import { autoUpdater } from 'electron-updater';
 import * as path from 'path';
 import { getSettings, saveSettings, isConfigured, getReviewContext, saveReviewContext, pruneOldReviewContexts, getReviewHistory, saveReviewEntry, updateReviewNotes, pruneOldReviewHistory, ReviewEntry, getReviewCheckpoint, saveReviewCheckpoint, ReviewCheckpoint } from './settings';
-import { GitLabService, MergeRequest } from './gitlab';
+import { DiffPosition, GitLabService, MergeRequest } from './gitlab';
 import { startPolling, stopPolling, resetPolling, setUpdateCallback, getDebugState, setWindowFocus, getCurrentUserId } from './polling';
 import { findLocalRepo, buildRepoCache } from './localRepo';
 import { openInIde } from './ide';
@@ -121,6 +121,54 @@ ipcMain.handle('get-new-changes-diff', async (_e, projectId: number, fromSha: st
   const { gitlabToken, gitlabUrl } = getSettings();
   const svc = new GitLabService(gitlabUrl, gitlabToken);
   return svc.getCompareChanges(projectId, fromSha, toSha);
+});
+
+ipcMain.handle('get-mr-discussions', async (_e, projectId: number, mrIid: number) => {
+  const { gitlabToken, gitlabUrl } = getSettings();
+  const svc = new GitLabService(gitlabUrl, gitlabToken);
+  return svc.getMrDiscussions(projectId, mrIid);
+});
+
+ipcMain.handle('create-mr-comment', async (_e, projectId: number, mrIid: number, body: string) => {
+  const { gitlabToken, gitlabUrl } = getSettings();
+  const svc = new GitLabService(gitlabUrl, gitlabToken);
+  return svc.createMrComment(projectId, mrIid, body);
+});
+
+ipcMain.handle('create-diff-comment', async (_e, projectId: number, mrIid: number, position: DiffPosition, body: string) => {
+  const { gitlabToken, gitlabUrl } = getSettings();
+  const svc = new GitLabService(gitlabUrl, gitlabToken);
+  return svc.createDiffComment(projectId, mrIid, position, body);
+});
+
+ipcMain.handle('reply-to-discussion', async (_e, projectId: number, mrIid: number, discussionId: string, body: string) => {
+  const { gitlabToken, gitlabUrl } = getSettings();
+  const svc = new GitLabService(gitlabUrl, gitlabToken);
+  return svc.replyToDiscussion(projectId, mrIid, discussionId, body);
+});
+
+ipcMain.handle('set-discussion-resolved', async (_e, projectId: number, mrIid: number, discussionId: string, resolved: boolean) => {
+  const { gitlabToken, gitlabUrl } = getSettings();
+  const svc = new GitLabService(gitlabUrl, gitlabToken);
+  return svc.setDiscussionResolved(projectId, mrIid, discussionId, resolved);
+});
+
+ipcMain.handle('update-comment', async (_e, projectId: number, mrIid: number, discussionId: string, noteId: number, body: string) => {
+  const { gitlabToken, gitlabUrl } = getSettings();
+  const svc = new GitLabService(gitlabUrl, gitlabToken);
+  return svc.updateDiscussionNote(projectId, mrIid, discussionId, noteId, body);
+});
+
+ipcMain.handle('delete-comment', async (_e, projectId: number, mrIid: number, discussionId: string, noteId: number) => {
+  const { gitlabToken, gitlabUrl } = getSettings();
+  const svc = new GitLabService(gitlabUrl, gitlabToken);
+  await svc.deleteDiscussionNote(projectId, mrIid, discussionId, noteId);
+});
+
+ipcMain.handle('get-latest-mr-version', async (_e, projectId: number, mrIid: number) => {
+  const { gitlabToken, gitlabUrl } = getSettings();
+  const svc = new GitLabService(gitlabUrl, gitlabToken);
+  return svc.getLatestMrVersion(projectId, mrIid);
 });
 
 ipcMain.handle('open-in-ide', (_e, projectHttpUrl: string) => {

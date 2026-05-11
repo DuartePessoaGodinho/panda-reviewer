@@ -24,7 +24,7 @@ export const useMrsStore = defineStore('mrs', () => {
   const toReviewMrs = ref<MR[]>([]);
   const myMrs = ref<MR[]>([]);
   const activeMr = ref<MR | null>(null);
-  const activePanelTab = ref<'diff' | 'ai'>('diff');
+  const activePanelTab = ref<'diff' | 'comments' | 'ai'>('diff');
   const aiDrawerOpen = ref(false);
   const currentUserId = ref<number | null>(null);
   const locallyApproved = ref(new Set<number>());
@@ -66,7 +66,7 @@ export const useMrsStore = defineStore('mrs', () => {
     activeMr.value = mr;
   }
 
-  function setActivePanelTab(tab: 'diff' | 'ai') {
+  function setActivePanelTab(tab: 'diff' | 'comments' | 'ai') {
     activePanelTab.value = tab;
   }
 

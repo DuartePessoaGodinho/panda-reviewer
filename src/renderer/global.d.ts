@@ -1,4 +1,12 @@
-import type { AiReviewProvider, ReviewCheckpoint, ReviewEntry } from './types';
+import type {
+  AiReviewProvider,
+  DiffPosition,
+  GitLabDiscussion,
+  GitLabDiscussionNote,
+  MergeRequestVersion,
+  ReviewCheckpoint,
+  ReviewEntry,
+} from './types';
 
 interface ElectronAPI {
   getSettings: () => Promise<any>;
@@ -6,6 +14,14 @@ interface ElectronAPI {
   getMrs: () => Promise<{ toReview: any[]; myMrs: any[]; currentUserId: number | null }>;
   getMrDiff: (projectId: number, mrIid: number) => Promise<any>;
   getNewChangesDiff: (projectId: number, fromSha: string, toSha: string) => Promise<any>;
+  getMrDiscussions: (projectId: number, mrIid: number) => Promise<GitLabDiscussion[]>;
+  createMrComment: (projectId: number, mrIid: number, body: string) => Promise<GitLabDiscussion>;
+  createDiffComment: (projectId: number, mrIid: number, position: DiffPosition, body: string) => Promise<GitLabDiscussion>;
+  replyToDiscussion: (projectId: number, mrIid: number, discussionId: string, body: string) => Promise<GitLabDiscussionNote>;
+  setDiscussionResolved: (projectId: number, mrIid: number, discussionId: string, resolved: boolean) => Promise<GitLabDiscussion>;
+  updateComment: (projectId: number, mrIid: number, discussionId: string, noteId: number, body: string) => Promise<GitLabDiscussionNote>;
+  deleteComment: (projectId: number, mrIid: number, discussionId: string, noteId: number) => Promise<void>;
+  getLatestMrVersion: (projectId: number, mrIid: number) => Promise<MergeRequestVersion | null>;
   openInIde: (url: string) => Promise<{ found: boolean; cloneUrl?: string }>;
   openExternal: (url: string) => void;
   pickFolder: () => Promise<string | null>;

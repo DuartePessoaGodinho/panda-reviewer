@@ -19,6 +19,60 @@ export interface ReviewCheckpoint {
 
 export type AiReviewProvider = 'claude' | 'copilot' | 'codex';
 
+export interface GitLabUser {
+  id: number;
+  username: string;
+  name: string;
+  avatar_url: string;
+  web_url?: string;
+}
+
+export interface DiffPosition {
+  base_sha: string;
+  start_sha: string;
+  head_sha: string;
+  position_type: 'text';
+  old_path: string;
+  new_path: string;
+  old_line?: number;
+  new_line?: number;
+}
+
+export interface MergeRequestVersion {
+  id: number;
+  head_commit_sha: string;
+  base_commit_sha: string;
+  start_commit_sha: string;
+  created_at: string;
+  merge_request_id: number;
+  state: string;
+}
+
+export interface GitLabDiscussionNote {
+  id: number;
+  type: string | null;
+  body: string;
+  attachment?: string | null;
+  author: GitLabUser;
+  created_at: string;
+  updated_at: string;
+  system: boolean;
+  noteable_id: number;
+  noteable_type: string;
+  noteable_iid?: number | null;
+  project_id: number;
+  resolvable?: boolean;
+  resolved?: boolean;
+  resolved_by?: GitLabUser | null;
+  position?: DiffPosition | null;
+}
+
+export interface GitLabDiscussion {
+  id: string;
+  individual_note: boolean;
+  notes: GitLabDiscussionNote[];
+}
+
 export interface MR {
   id: number;
   iid: number;

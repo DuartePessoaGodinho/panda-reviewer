@@ -14,7 +14,7 @@
 
     <!-- Detail workspace -->
     <template v-else>
-      <div v-if="isCompact" class="panel-tabs">
+      <div class="panel-tabs">
         <button
           class="panel-tab"
           :class="{ active: mrs.activePanelTab === 'diff' }"
@@ -25,6 +25,17 @@
             <path d="M5 10.5a.5.5 0 0 1 .5-.5h5a.5.5 0 0 1 0 1h-5a.5.5 0 0 1-.5-.5zm0-3a.5.5 0 0 1 .5-.5h7a.5.5 0 0 1 0 1h-7a.5.5 0 0 1-.5-.5zm0-3a.5.5 0 0 1 .5-.5h7a.5.5 0 0 1 0 1h-7a.5.5 0 0 1-.5-.5z"/>
           </svg>
           Diff
+        </button>
+        <button
+          class="panel-tab ai-tab"
+          :class="{ active: mrs.activePanelTab === 'comments' }"
+          @click="showComments"
+        >
+          <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+            <path d="M2 3.5A2.5 2.5 0 0 1 4.5 1h7A2.5 2.5 0 0 1 14 3.5v4A2.5 2.5 0 0 1 11.5 10H7.9l-3.2 2.4A.45.45 0 0 1 4 12.04V10A2 2 0 0 1 2 8V3.5Z"/>
+          </svg>
+          Comments
+          <span v-if="commentTabCount > 0" class="panel-tab-count">{{ commentTabCount }}</span>
         </button>
         <button
           class="panel-tab ai-tab"
@@ -43,6 +54,10 @@
         :mr="mrs.activeMr"
         :ai-enabled="props.aiEnabled"
         :provider-label="props.providerLabel"
+      />
+      <CommentsPanel
+        v-else-if="mrs.activePanelTab === 'comments'"
+        :mr="mrs.activeMr"
       />
 
       <div v-else class="review-workspace">
@@ -149,10 +164,33 @@
             </div>
             <div
               class="diff-content"
+              ref="diffContentRef"
               @click="handleDiffContentClick"
               @keydown="handleDiffContentKeydown"
               v-html="diffHtml"
             ></div>
+            <div
+              v-if="inlineDraft"
+              class="inline-comment-popover"
+              :style="{ top: `${inlineDraft.top}px`, left: `${inlineDraft.left}px` }"
+            >
+              <div class="inline-comment-title">
+                {{ inlineDraft.label }}
+                <button type="button" @click="cancelInlineDraft">×</button>
+              </div>
+              <textarea
+                v-model="inlineBody"
+                class="inline-comment-textarea"
+                placeholder="Add an inline comment..."
+                :disabled="commentState.posting"
+              ></textarea>
+              <div class="inline-comment-actions">
+                <span class="comment-error">{{ inlineError || commentState.error }}</span>
+                <button class="inline-comment-submit" :disabled="commentState.posting || !inlineBody.trim()" @click="submitInlineComment">
+                  {{ commentState.posting ? 'Posting...' : 'Comment' }}
+                </button>
+              </div>
+            </div>
           </template>
         </div>
 
@@ -191,9 +229,12 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useMrsStore } from '../stores/mrs';
-import type { ReviewCheckpoint } from '../../types';
+import { useCommentsStore } from '../stores/comments';
+import type { DiffPosition, GitLabDiscussion, GitLabDiscussionNote, ReviewCheckpoint } from '../../types';
 import * as Diff2Html from 'diff2html';
 import AiPanel from './AiPanel/index.vue';
+import CommentsPanel from './CommentsPanel.vue';
+import { renderMarkdown } from '../utils';
 
 const props = defineProps<{ aiEnabled: boolean; providerLabel: string }>();
 
@@ -208,11 +249,30 @@ const diffMode    = ref<DiffMode>('full');
 const checkpoint  = ref<ReviewCheckpoint | null>(null);
 const markingReviewed = ref(false);
 const isCompact = ref(false);
+const comments = useCommentsStore();
+const currentChanges = ref<any[]>([]);
+const currentCombinedDiff = ref('');
+const diffContentRef = ref<HTMLElement | null>(null);
+const inlineBody = ref('');
+const inlineError = ref('');
+const inlineDraft = ref<{
+  top: number;
+  left: number;
+  label: string;
+  old_path: string;
+  new_path: string;
+  old_line?: number;
+  new_line?: number;
+} | null>(null);
 let compactQuery: MediaQueryList | null = null;
 const changedLines = computed(() => diffStats.value.added + diffStats.value.deleted);
 const currentSha = computed(() => mrs.activeMr?.sha ?? '');
+const commentState = computed(() => comments.getState(mrs.activeMr));
+const commentTabCount = computed(() =>
+  commentState.value.discussions.filter(discussion => discussion.notes.some(note => !note.system)).length
+);
 const shouldShowDiff = computed(() =>
-  Boolean(mrs.activeMr && (!isCompact.value || mrs.activePanelTab === 'diff'))
+  Boolean(mrs.activeMr && mrs.activePanelTab !== 'comments' && (!isCompact.value || mrs.activePanelTab === 'diff'))
 );
 const hasNewChanges = computed(() =>
   Boolean(checkpoint.value?.sourceSha && currentSha.value && checkpoint.value.sourceSha !== currentSha.value)
@@ -249,6 +309,12 @@ function shortSha(sha: string) {
 function showDiff() {
   mrs.setActivePanelTab('diff');
   if (!isCompact.value) mrs.setAiDrawerOpen(false);
+}
+
+function showComments() {
+  mrs.setActivePanelTab('comments');
+  mrs.setAiDrawerOpen(false);
+  if (mrs.activeMr) void comments.load(mrs.activeMr);
 }
 
 function toggleAiReview() {
@@ -293,6 +359,116 @@ function makeDiffFilesCollapsible(html: string) {
   return doc.body.firstElementChild?.innerHTML ?? html;
 }
 
+function commentKey(position: Pick<DiffPosition, 'old_path' | 'new_path' | 'old_line' | 'new_line'>) {
+  return [
+    position.old_path,
+    position.new_path,
+    position.old_line ?? '',
+    position.new_line ?? '',
+  ].join(':');
+}
+
+function discussionPosition(discussion: GitLabDiscussion): DiffPosition | null {
+  return discussion.notes.find(note => note.position)?.position ?? null;
+}
+
+function isCurrentDiscussionPosition(position: DiffPosition | null): boolean {
+  if (!position) return false;
+  return !currentSha.value || position.head_sha === currentSha.value;
+}
+
+function discussionsByPosition(discussions: GitLabDiscussion[]) {
+  const map = new Map<string, GitLabDiscussion[]>();
+  for (const discussion of discussions) {
+    const position = discussionPosition(discussion);
+    if (!isCurrentDiscussionPosition(position)) continue;
+    if (!position) continue;
+    const key = commentKey(position);
+    const grouped = map.get(key) ?? [];
+    grouped.push(discussion);
+    map.set(key, grouped);
+  }
+  return map;
+}
+
+function firstVisibleNote(discussion: GitLabDiscussion): GitLabDiscussionNote | null {
+  return discussion.notes.find(note => !note.system) ?? discussion.notes[0] ?? null;
+}
+
+function formatInlineDiscussion(doc: Document, discussion: GitLabDiscussion) {
+  const note = firstVisibleNote(discussion);
+  const wrapper = doc.createElement('div');
+  wrapper.className = `inline-discussion${note?.resolved ? ' resolved' : ''}`;
+
+  const meta = doc.createElement('div');
+  meta.className = 'inline-discussion-meta';
+  meta.textContent = note
+    ? `${note.author.name} · ${new Date(note.created_at).toLocaleString()}`
+    : 'Discussion';
+
+  const body = doc.createElement('div');
+  body.className = 'inline-discussion-body';
+  body.innerHTML = renderMarkdown(note?.body ?? '');
+
+  wrapper.append(meta, body);
+  return wrapper;
+}
+
+function decorateDiffHtml(html: string, changes: any[], discussions: GitLabDiscussion[]) {
+  const doc = new DOMParser().parseFromString(`<div>${html}</div>`, 'text/html');
+  const byPosition = discussionsByPosition(discussions);
+
+  doc.querySelectorAll('.d2h-file-wrapper').forEach((file, fileIndex) => {
+    const change = changes[fileIndex];
+    if (!change) return;
+
+    file.querySelectorAll('tbody tr').forEach((row) => {
+      const oldLine = row.querySelector('.line-num1')?.textContent?.trim();
+      const newLine = row.querySelector('.line-num2')?.textContent?.trim();
+      const codeCell = row.querySelector('td:nth-child(2)');
+      if (!codeCell || (!oldLine && !newLine) || codeCell.classList.contains('d2h-info')) return;
+
+      const oldLineNum = oldLine ? Number(oldLine) : undefined;
+      const newLineNum = newLine ? Number(newLine) : undefined;
+      const kind = codeCell.classList.contains('d2h-ins')
+        ? 'new'
+        : codeCell.classList.contains('d2h-del')
+          ? 'old'
+          : 'context';
+
+      row.setAttribute('data-commentable-line', 'true');
+      row.setAttribute('data-old-path', change.old_path);
+      row.setAttribute('data-new-path', change.new_path);
+      row.setAttribute('data-line-kind', kind);
+      if (oldLineNum) row.setAttribute('data-old-line', String(oldLineNum));
+      if (newLineNum) row.setAttribute('data-new-line', String(newLineNum));
+      row.setAttribute('title', diffMode.value === 'new'
+        ? 'Inline comments are disabled in New changes view'
+        : 'Click to comment on this line');
+
+      const rowDiscussions = byPosition.get(commentKey({
+        old_path: change.old_path,
+        new_path: change.new_path,
+        old_line: oldLineNum,
+        new_line: newLineNum,
+      }));
+      if (!rowDiscussions?.length) return;
+
+      const discussionRow = doc.createElement('tr');
+      discussionRow.className = 'inline-discussions-row';
+      const emptyCell = doc.createElement('td');
+      emptyCell.className = 'd2h-code-linenumber d2h-cntx';
+      const discussionCell = doc.createElement('td');
+      discussionCell.className = 'inline-discussions-cell';
+      rowDiscussions.forEach(discussion => discussionCell.appendChild(formatInlineDiscussion(doc, discussion)));
+      discussionRow.append(emptyCell, discussionCell);
+      row.after(discussionRow);
+    });
+  });
+
+  return doc.body.firstElementChild?.innerHTML ?? html;
+}
+
 function toggleFileDiff(file: Element) {
   const fileDiff = file?.querySelector('.d2h-file-diff');
   const toggle = file.querySelector<HTMLButtonElement>('.d2h-file-toggle');
@@ -321,13 +497,14 @@ function parseDiffStats(diff: string) {
   };
 }
 
-function renderDiff(diff: string) {
+function renderDiff(diff: string, changes = currentChanges.value) {
   diffStats.value = parseDiffStats(diff);
-  diffHtml.value = makeDiffFilesCollapsible(Diff2Html.html(diff, {
+  const html = makeDiffFilesCollapsible(Diff2Html.html(diff, {
     drawFileList: true,
     outputFormat: 'line-by-line',
     renderNothingWhenEmpty: false,
   }));
+  diffHtml.value = decorateDiffHtml(html, changes, commentState.value.discussions);
 }
 
 function fullDiffFromChanges(changes: any[]) {
@@ -346,18 +523,23 @@ async function loadDiff() {
   diffStats.value   = { files: 0, added: 0, deleted: 0 };
 
   try {
+    await comments.load(mr);
     if (diffMode.value === 'new') {
       if (!checkpoint.value || !hasNewChanges.value) {
         diffMode.value = 'full';
       } else {
         const { changes } = await window.api.getNewChangesDiff(mr.project_id, checkpoint.value.sourceSha, currentSha.value);
-        renderDiff(fullDiffFromChanges(changes));
+        currentChanges.value = changes;
+        currentCombinedDiff.value = fullDiffFromChanges(changes);
+        renderDiff(currentCombinedDiff.value, changes);
         return;
       }
     }
 
     const { changes } = await window.api.getMrDiff(mr.project_id, mr.iid);
-    renderDiff(fullDiffFromChanges(changes));
+    currentChanges.value = changes;
+    currentCombinedDiff.value = fullDiffFromChanges(changes);
+    renderDiff(currentCombinedDiff.value, changes);
   } catch {
     diffError.value = true;
   } finally {
@@ -394,10 +576,16 @@ async function markReviewed() {
 
 function handleDiffContentClick(event: MouseEvent) {
   const file = findToggleFile(event.target as HTMLElement | null);
-  if (!file) return;
+  if (file) {
+    event.preventDefault();
+    toggleFileDiff(file);
+    return;
+  }
 
+  const line = (event.target as HTMLElement | null)?.closest<HTMLElement>('tr[data-commentable-line="true"]');
+  if (!line) return;
   event.preventDefault();
-  toggleFileDiff(file);
+  openInlineDraft(line);
 }
 
 function handleDiffContentKeydown(event: KeyboardEvent) {
@@ -408,6 +596,61 @@ function handleDiffContentKeydown(event: KeyboardEvent) {
 
   event.preventDefault();
   toggleFileDiff(file);
+}
+
+function openInlineDraft(row: HTMLElement) {
+  inlineError.value = '';
+  if (diffMode.value === 'new') {
+    inlineError.value = 'Inline comments are disabled in New changes view.';
+    return;
+  }
+
+  const wrapRect = row.closest('.diff-content-wrap')?.getBoundingClientRect();
+  const rowRect = row.getBoundingClientRect();
+  const oldLine = row.dataset.oldLine ? Number(row.dataset.oldLine) : undefined;
+  const newLine = row.dataset.newLine ? Number(row.dataset.newLine) : undefined;
+  const path = row.dataset.newPath || row.dataset.oldPath || '';
+  const lineLabel = newLine ?? oldLine;
+
+  inlineDraft.value = {
+    top: Math.min(
+      Math.max(58, rowRect.bottom - (wrapRect?.top ?? 0) + 6),
+      Math.max(72, (wrapRect?.height ?? 520) - 210)
+    ),
+    left: Math.min(92, Math.max(14, rowRect.left - (wrapRect?.left ?? 0) + 68)),
+    label: `${path}${lineLabel ? `:${lineLabel}` : ''}`,
+    old_path: row.dataset.oldPath ?? path,
+    new_path: row.dataset.newPath ?? path,
+    old_line: oldLine,
+    new_line: newLine,
+  };
+}
+
+function cancelInlineDraft() {
+  inlineDraft.value = null;
+  inlineBody.value = '';
+  inlineError.value = '';
+}
+
+async function submitInlineComment() {
+  const mr = mrs.activeMr;
+  const draft = inlineDraft.value;
+  const body = inlineBody.value.trim();
+  if (!mr || !draft || !body) return;
+
+  inlineError.value = '';
+  try {
+    await comments.createDiffComment(mr, {
+      old_path: draft.old_path,
+      new_path: draft.new_path,
+      old_line: draft.old_line,
+      new_line: draft.new_line,
+    }, body);
+    cancelInlineDraft();
+    renderDiff(currentCombinedDiff.value);
+  } catch {
+    inlineError.value = 'Could not post inline comment. Refresh the diff and try again.';
+  }
 }
 
 watch(
@@ -432,6 +675,16 @@ watch(
   (available) => {
     if (!available && diffMode.value === 'new') diffMode.value = 'full';
   }
+);
+
+watch(
+  () => commentState.value.discussions,
+  () => {
+    if (currentCombinedDiff.value && shouldShowDiff.value) {
+      renderDiff(currentCombinedDiff.value);
+    }
+  },
+  { deep: true }
 );
 
 onMounted(() => {
@@ -535,6 +788,22 @@ onBeforeUnmount(() => {
   height: 13px;
   opacity: 0.78;
 }
+.panel-tab-count {
+  min-width: 18px;
+  height: 17px;
+  padding: 1px 5px;
+  border-radius: 5px;
+  background: var(--surface3);
+  color: var(--text2);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1.5;
+}
+.panel-tab.active .panel-tab-count {
+  background: var(--accent-dim);
+  color: var(--accent);
+}
 .panel-tab.active {
   background: linear-gradient(180deg, var(--surface3), var(--surface2));
   border-color: var(--border2);
@@ -573,6 +842,7 @@ onBeforeUnmount(() => {
 }
 
 .diff-content-wrap {
+  position: relative;
   flex: 1;
   min-width: 0;
   overflow: hidden;
@@ -672,7 +942,8 @@ onBeforeUnmount(() => {
   letter-spacing: -0.02em;
 }
 
-.ai-review-toggle {
+.ai-review-toggle,
+.comments-toggle {
   height: 30px;
   padding: 0 11px;
   border: 1px solid var(--accent-border);
@@ -692,18 +963,22 @@ onBeforeUnmount(() => {
 }
 
 .ai-review-toggle:hover,
-.ai-review-toggle.active {
+.ai-review-toggle.active,
+.comments-toggle:hover,
+.comments-toggle.active {
   background: rgba(23,207,139,0.16);
   border-color: var(--accent);
   box-shadow: 0 0 14px var(--accent-glow);
 }
 
-.ai-review-toggle:focus-visible {
+.ai-review-toggle:focus-visible,
+.comments-toggle:focus-visible {
   outline: none;
   box-shadow: 0 0 0 3px var(--accent-bg);
 }
 
-.ai-review-toggle svg {
+.ai-review-toggle svg,
+.comments-toggle svg {
   width: 12px;
   height: 12px;
   flex-shrink: 0;
@@ -968,6 +1243,109 @@ onBeforeUnmount(() => {
   user-select: text;
 }
 
+.inline-comment-popover {
+  position: absolute;
+  z-index: 20;
+  width: min(460px, calc(100% - 112px));
+  border: 1px solid var(--accent-border);
+  border-radius: 10px;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.035), transparent 42%),
+    var(--surface);
+  box-shadow: 0 18px 50px rgba(0,0,0,0.62), 0 0 0 1px rgba(23,207,139,0.04);
+  padding: 10px;
+  animation: commentPopoverIn 0.14s ease both;
+}
+
+.inline-comment-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  color: var(--text2);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  margin-bottom: 7px;
+}
+
+.inline-comment-title button {
+  width: 22px;
+  height: 22px;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  background: var(--surface2);
+  color: var(--text3);
+  cursor: pointer;
+  transition: color 0.12s, border-color 0.12s, background 0.12s;
+}
+.inline-comment-title button:hover {
+  color: var(--text2);
+  border-color: var(--border2);
+  background: var(--surface3);
+}
+
+.inline-comment-textarea {
+  width: 100%;
+  min-height: 74px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-ui);
+  font-size: 13px;
+  line-height: 1.5;
+  outline: none;
+  resize: vertical;
+  padding: 8px 9px;
+  user-select: text;
+  transition: border-color 0.14s, box-shadow 0.14s;
+}
+
+.inline-comment-textarea:focus {
+  border-color: var(--accent-border);
+  box-shadow: 0 0 0 3px var(--accent-bg);
+}
+
+.inline-comment-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.comment-error {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--red);
+  font-size: 12px;
+}
+
+.inline-comment-submit {
+  border: 1px solid var(--accent-border);
+  border-radius: 6px;
+  background: var(--accent-dim);
+  color: var(--accent);
+  cursor: pointer;
+  font-family: var(--font-ui);
+  font-size: 12px;
+  font-weight: 600;
+  padding: 6px 11px;
+  transition: background 0.12s, border-color 0.12s, transform 0.12s;
+}
+.inline-comment-submit:hover:not(:disabled) {
+  background: rgba(23,207,139,0.16);
+  border-color: var(--accent);
+  transform: translateY(-1px);
+}
+
+.inline-comment-submit:disabled {
+  opacity: 0.42;
+  cursor: not-allowed;
+}
+
 /* ── diff2html theming ── */
 .diff-content :deep(.d2h-wrapper) {
   background: transparent !important;
@@ -1209,7 +1587,71 @@ onBeforeUnmount(() => {
   display: none;
   background: transparent !important;
 }
+.diff-content :deep(tr[data-commentable-line="true"]) {
+  cursor: cell;
+}
+.diff-content :deep(tr[data-commentable-line="true"]:hover td) {
+  box-shadow: inset 3px 0 0 var(--accent-border);
+}
+.diff-content :deep(tr[data-commentable-line="true"]:hover .d2h-code-linenumber::after) {
+  content: "+";
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  margin-left: 6px;
+  border-radius: 4px;
+  background: var(--accent-dim);
+  color: var(--accent);
+  font-family: var(--font-ui);
+  font-size: 12px;
+  font-weight: 800;
+}
+.diff-content :deep(.inline-discussions-cell) {
+  background: rgba(23,207,139,0.035) !important;
+  border-top: 1px solid var(--border) !important;
+  padding: 8px 12px 9px !important;
+}
+.diff-content :deep(.inline-discussion) {
+  border: 1px solid var(--accent-border);
+  border-radius: 8px;
+  background:
+    linear-gradient(180deg, rgba(23,207,139,0.04), transparent 58%),
+    var(--surface);
+  padding: 8px 10px;
+  margin: 4px 0;
+  color: var(--text2);
+  white-space: normal;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.025);
+}
+.diff-content :deep(.inline-discussion.resolved) {
+  opacity: 0.7;
+}
+.diff-content :deep(.inline-discussion-meta) {
+  color: var(--text3);
+  font-family: var(--font-ui);
+  font-size: 12px;
+  margin-bottom: 5px;
+}
+.diff-content :deep(.inline-discussion-body) {
+  color: var(--text2);
+  font-family: var(--font-ui);
+  font-size: 13px;
+  line-height: 1.5;
+}
+.diff-content :deep(.inline-discussion-body p) {
+  margin-bottom: 6px;
+}
+.diff-content :deep(.inline-discussion-body p:last-child) {
+  margin-bottom: 0;
+}
 .diff-content :deep(.d2h-file-added-icon)   { color: var(--green)  !important; }
 .diff-content :deep(.d2h-file-deleted-icon) { color: var(--red)    !important; }
 .diff-content :deep(.d2h-file-renamed-icon) { color: var(--yellow) !important; }
+
+@keyframes commentPopoverIn {
+  from { opacity: 0; transform: translateY(-4px) scale(0.985); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
 </style>

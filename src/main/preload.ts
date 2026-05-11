@@ -8,6 +8,22 @@ contextBridge.exposeInMainWorld('api', {
     ipcRenderer.invoke('get-mr-diff', projectId, mrIid),
   getNewChangesDiff: (projectId: number, fromSha: string, toSha: string) =>
     ipcRenderer.invoke('get-new-changes-diff', projectId, fromSha, toSha),
+  getMrDiscussions: (projectId: number, mrIid: number) =>
+    ipcRenderer.invoke('get-mr-discussions', projectId, mrIid),
+  createMrComment: (projectId: number, mrIid: number, body: string) =>
+    ipcRenderer.invoke('create-mr-comment', projectId, mrIid, body),
+  createDiffComment: (projectId: number, mrIid: number, position: unknown, body: string) =>
+    ipcRenderer.invoke('create-diff-comment', projectId, mrIid, position, body),
+  replyToDiscussion: (projectId: number, mrIid: number, discussionId: string, body: string) =>
+    ipcRenderer.invoke('reply-to-discussion', projectId, mrIid, discussionId, body),
+  setDiscussionResolved: (projectId: number, mrIid: number, discussionId: string, resolved: boolean) =>
+    ipcRenderer.invoke('set-discussion-resolved', projectId, mrIid, discussionId, resolved),
+  updateComment: (projectId: number, mrIid: number, discussionId: string, noteId: number, body: string) =>
+    ipcRenderer.invoke('update-comment', projectId, mrIid, discussionId, noteId, body),
+  deleteComment: (projectId: number, mrIid: number, discussionId: string, noteId: number) =>
+    ipcRenderer.invoke('delete-comment', projectId, mrIid, discussionId, noteId),
+  getLatestMrVersion: (projectId: number, mrIid: number) =>
+    ipcRenderer.invoke('get-latest-mr-version', projectId, mrIid),
   openInIde: (projectHttpUrl: string) => ipcRenderer.invoke('open-in-ide', projectHttpUrl),
   openExternal: (url: string) => ipcRenderer.invoke('open-external', url),
   pickFolder: () => ipcRenderer.invoke('pick-folder'),
