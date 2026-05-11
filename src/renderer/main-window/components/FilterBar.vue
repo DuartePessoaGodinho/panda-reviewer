@@ -7,6 +7,8 @@
           :key="opt.value"
           class="fb-chip"
           :class="{ active: filters.approval === opt.value }"
+          v-motion
+          :tapped="{ scale: 0.94, transition: { duration: 80 } }"
           @click="filters.approval = opt.value"
         >{{ opt.label }}</button>
       </div>
@@ -32,18 +34,24 @@
       <button
         class="fb-chip toggle"
         :class="{ active: filters.noComments }"
+        v-motion
+        :tapped="{ scale: 0.94, transition: { duration: 80 } }"
         @click="filters.noComments = !filters.noComments"
       >No comments</button>
 
       <button
         class="fb-chip toggle"
         :class="{ active: filters.hideDrafts }"
+        v-motion
+        :tapped="{ scale: 0.94, transition: { duration: 80 } }"
         @click="filters.hideDrafts = !filters.hideDrafts"
       >Hide drafts</button>
 
-      <button v-if="filters.isAnyActive" class="fb-clear" @click="filters.reset()">
-        Clear all
-      </button>
+      <Transition name="fade">
+        <button v-if="filters.isAnyActive" class="fb-clear" @click="filters.reset()">
+          Clear all
+        </button>
+      </Transition>
     </div>
   </div>
 </template>
@@ -69,7 +77,7 @@ const approvalOptions: { value: ApprovalFilter; label: string }[] = [
   flex-direction: column;
   gap: 6px;
   flex-shrink: 0;
-  background: var(--surface);
+  background: linear-gradient(180deg, rgba(255,255,255,0.012) 0%, transparent 100%), var(--surface);
 }
 
 .fb-row {
@@ -89,15 +97,16 @@ const approvalOptions: { value: ApprovalFilter; label: string }[] = [
   font-size: 12px;
   font-weight: 500;
   padding: 3px 9px;
-  border-radius: 5px;
+  border-radius: var(--radius-sm);
   border: 1px solid var(--border);
   background: transparent;
   color: var(--text3);
   cursor: pointer;
   line-height: 1.5;
   white-space: nowrap;
-  transition: background 0.12s, color 0.12s, border-color 0.12s;
+  transition: background var(--dur-fast), color var(--dur-fast), border-color var(--dur-fast), box-shadow var(--dur-fast);
   letter-spacing: -0.01em;
+  will-change: transform;
 }
 .fb-chip:hover { background: var(--surface2); color: var(--text2); border-color: var(--border2); }
 
@@ -107,11 +116,12 @@ const approvalOptions: { value: ApprovalFilter; label: string }[] = [
   border-color: var(--accent-border);
   color: var(--accent);
   font-weight: 600;
+  box-shadow: 0 0 10px var(--accent-glow2);
 }
 
 /* Toggle chips (no-comments, hide-drafts) */
 .fb-chip.toggle.active {
-  background: var(--surface2);
+  background: var(--surface3);
   border-color: var(--border2);
   color: var(--text2);
   font-weight: 600;
@@ -162,13 +172,13 @@ const approvalOptions: { value: ApprovalFilter; label: string }[] = [
   font-size: 12px;
   font-weight: 500;
   padding: 3px 9px;
-  border-radius: 5px;
+  border-radius: var(--radius-sm);
   border: 1px solid transparent;
   background: transparent;
   color: var(--text3);
   cursor: pointer;
   white-space: nowrap;
-  transition: background 0.12s, color 0.12s, border-color 0.12s;
+  transition: background var(--dur-fast), color var(--dur-fast), border-color var(--dur-fast);
   letter-spacing: -0.01em;
 }
 .fb-clear:hover {
@@ -176,4 +186,9 @@ const approvalOptions: { value: ApprovalFilter; label: string }[] = [
   color: var(--text2);
   border-color: var(--border);
 }
+
+/* fade transition for Clear button */
+.fade-enter-active { transition: opacity 0.15s; }
+.fade-leave-active { transition: opacity 0.1s; }
+.fade-enter-from, .fade-leave-to { opacity: 0; }
 </style>

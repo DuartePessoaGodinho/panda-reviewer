@@ -8,7 +8,11 @@
       'card-pipeline-fail': pipelineStatus === 'failed',
       'card-pipeline-run': pipelineStatus === 'running' || pipelineStatus === 'pending',
     }"
-    :style="{ animationDelay: `${index * 0.04}s` }"
+    v-motion
+    :initial="{ opacity: 0, y: 14 }"
+    :enter="{ opacity: draft ? 0.75 : 1, y: 0, transition: { type: 'spring', stiffness: 320, damping: 28, delay: index * 48 } }"
+    :hovered="{ y: -2, transition: { duration: 120 } }"
+    :tapped="{ scale: 0.985, y: 0, transition: { duration: 80 } }"
     role="button"
     tabindex="0"
     :aria-label="`View diff for ${title}`"
@@ -161,29 +165,45 @@ const aiDisabledTitle = computed(() => {
   background: var(--surface);
   border: 1px solid var(--border);
   border-left: 2px solid var(--border);
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   padding: 13px 14px 11px;
   margin-bottom: 6px;
   cursor: pointer;
-  transition: border-color 0.15s, background 0.15s, box-shadow 0.15s;
+  transition: border-color var(--dur-fast), background var(--dur-fast), box-shadow var(--dur-base);
   position: relative;
   min-width: 0;
   overflow: hidden;
+  will-change: transform;
+}
+.mr-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(180deg, rgba(255,255,255,0.015) 0%, transparent 50%);
+  pointer-events: none;
 }
 .mr-card:hover {
   background: var(--surface2);
   border-color: var(--border2);
   border-left-color: var(--border2);
-  box-shadow: 0 2px 16px rgba(0,0,0,0.3);
+  box-shadow: var(--shadow-md);
 }
-.mr-card:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.mr-card:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 4px var(--accent-bg);
+}
 
 /* State: active selection */
 .mr-card.active {
   background: var(--surface2);
   border-color: var(--border2);
   border-left-color: var(--accent);
-  box-shadow: 0 2px 16px rgba(0,0,0,0.3);
+  box-shadow: var(--shadow-md);
+}
+.mr-card.active::before {
+  background: linear-gradient(180deg, rgba(30,214,154,0.04) 0%, transparent 50%);
 }
 
 /* State: pipeline */
@@ -192,10 +212,6 @@ const aiDisabledTitle = computed(() => {
 
 /* State: approved */
 .mr-card.card-approved { border-left-color: var(--accent); }
-
-/* State: draft */
-.mr-card.draft { opacity: 0.75; }
-.mr-card.draft:hover { opacity: 1; }
 
 /* Top section */
 .mr-card-top {
@@ -213,6 +229,11 @@ const aiDisabledTitle = computed(() => {
   flex-shrink: 0;
   object-fit: cover;
   border: 1.5px solid var(--border2);
+  transition: border-color var(--dur-fast), box-shadow var(--dur-fast);
+}
+.mr-card:hover .avatar {
+  border-color: var(--border2);
+  box-shadow: 0 0 0 2px var(--accent-bg);
 }
 
 .mr-meta { flex: 1; min-width: 0; }
@@ -312,13 +333,18 @@ const aiDisabledTitle = computed(() => {
   margin-top: 10px;
   padding-top: 10px;
   border-top: 1px solid var(--border);
-  opacity: 0.7;
-  transition: opacity 0.15s;
+  opacity: 0;
+  transform: translateY(3px);
+  transition: opacity var(--dur-base), transform var(--dur-base) var(--ease-out);
 }
 .card-actions.has-approve {
   grid-template-columns: minmax(0, 1fr) 33px 33px minmax(92px, 0.8fr) 33px;
 }
-.mr-card:hover .card-actions { opacity: 1; }
+.mr-card:hover .card-actions,
+.mr-card.active .card-actions {
+  opacity: 1;
+  transform: translateY(0);
+}
 
 .pin-btn {
   flex: 0;

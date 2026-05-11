@@ -2,14 +2,14 @@
   <div class="diff-panel">
     <!-- No MR selected -->
     <div v-if="!mrs.activeMr" class="diff-placeholder">
-      <div class="diff-placeholder-icon">
+      <div class="diff-placeholder-icon placeholder-icon-anim">
         <svg width="26" height="26" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
           <path d="M14 1H2a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V2a1 1 0 0 0-1-1zM2 0a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V2a2 2 0 0 0-2-2H2z"/>
           <path d="M5 10.5a.5.5 0 0 1 .5-.5h5a.5.5 0 0 1 0 1h-5a.5.5 0 0 1-.5-.5zm0-3a.5.5 0 0 1 .5-.5h7a.5.5 0 0 1 0 1h-7a.5.5 0 0 1-.5-.5zm0-3a.5.5 0 0 1 .5-.5h7a.5.5 0 0 1 0 1h-7a.5.5 0 0 1-.5-.5z"/>
         </svg>
       </div>
-      <strong class="diff-placeholder-title">No MR selected</strong>
-      <p>Click a merge request to view its diff,<br>or run an AI Review.</p>
+      <strong class="diff-placeholder-title placeholder-text-anim">No MR selected</strong>
+      <p class="placeholder-sub-anim">Click a merge request to view its diff,<br>or run an AI Review.</p>
     </div>
 
     <!-- Detail workspace -->
@@ -51,16 +51,17 @@
 
       <AiPanel
         v-if="isCompact && mrs.activePanelTab === 'ai'"
-        :mr="mrs.activeMr"
+        :mr="mrs.activeMr!"
         :ai-enabled="props.aiEnabled"
         :provider-label="props.providerLabel"
+        class="panel-content-fade"
       />
       <CommentsPanel
         v-else-if="mrs.activePanelTab === 'comments'"
-        :mr="mrs.activeMr"
+        :mr="mrs.activeMr!"
+        class="panel-content-fade"
       />
-
-      <div v-else class="review-workspace">
+      <div v-else class="review-workspace panel-content-fade">
         <div class="diff-content-wrap">
           <div v-if="loadingDiff" class="diff-placeholder">
             <div class="diff-placeholder-icon loading">
@@ -78,7 +79,7 @@
           </div>
           <template v-else>
             <div class="diff-summary">
-              <div class="diff-title" :title="mrs.activeMr.title">{{ mrs.activeMr.title }}</div>
+              <div class="diff-title" :title="mrs.activeMr?.title">{{ mrs.activeMr?.title }}</div>
               <button
                 v-if="!isCompact"
                 class="ai-review-toggle"
@@ -215,7 +216,7 @@
           </div>
           <div class="ai-drawer-body" :inert="!mrs.aiDrawerOpen">
             <AiPanel
-              :mr="mrs.activeMr"
+              :mr="mrs.activeMr!"
               :ai-enabled="props.aiEnabled"
               :provider-label="props.providerLabel"
             />
@@ -792,15 +793,17 @@ onBeforeUnmount(() => {
   gap: 10px;
 }
 .diff-placeholder-icon {
-  width: 52px; height: 52px;
-  background: var(--surface2);
+  width: 56px; height: 56px;
+  background: linear-gradient(180deg, var(--surface3), var(--surface2));
   border: 1px solid var(--border);
-  border-radius: 13px;
+  border-radius: var(--radius-lg);
   display: flex;
   align-items: center;
   justify-content: center;
   color: var(--text3);
-  margin-bottom: 4px;
+  margin-bottom: 6px;
+  box-shadow: var(--shadow-md), inset 0 1px 0 rgba(255,255,255,0.04);
+  will-change: transform;
 }
 .diff-placeholder-icon.loading svg { animation: spin 0.9s linear infinite; }
 .diff-placeholder-title {
@@ -816,14 +819,31 @@ onBeforeUnmount(() => {
   line-height: 1.6;
 }
 
+/* Placeholder staggered entrance */
+.placeholder-icon-anim {
+  animation: placeholderScale 0.36s var(--ease-spring) 0.05s both;
+}
+.placeholder-text-anim {
+  animation: placeholderFade 0.24s var(--ease-out) 0.18s both;
+}
+.placeholder-sub-anim {
+  animation: placeholderFade 0.24s var(--ease-out) 0.28s both;
+}
+@keyframes placeholderScale {
+  from { opacity: 0; transform: scale(0.78); }
+  to   { opacity: 1; transform: scale(1); }
+}
+@keyframes placeholderFade {
+  from { opacity: 0; transform: translateY(5px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
 /* Tab bar */
 .panel-tabs {
   display: flex;
   align-items: center;
   border-bottom: 1px solid var(--border);
-  background:
-    linear-gradient(180deg, rgba(255,255,255,0.025), transparent 64%),
-    var(--surface);
+  background: linear-gradient(180deg, var(--surface2) 0%, var(--surface) 100%);
   padding: 10px 14px 9px;
   flex-shrink: 0;
   min-height: 52px;
@@ -836,7 +856,7 @@ onBeforeUnmount(() => {
   height: 32px;
   min-width: 104px;
   border: 1px solid transparent;
-  background: rgba(255,255,255,0.018);
+  background: rgba(255,255,255,0.015);
   color: var(--text3);
   font-family: var(--font-ui);
   font-size: 13px;
@@ -846,17 +866,19 @@ onBeforeUnmount(() => {
   align-items: center;
   justify-content: center;
   gap: 6px;
-  border-radius: 7px;
-  transition: background 0.14s, border-color 0.14s, color 0.14s, box-shadow 0.14s;
+  border-radius: var(--radius-sm);
+  transition: background var(--dur-fast), border-color var(--dur-fast), color var(--dur-fast), box-shadow var(--dur-fast), transform var(--dur-fast) var(--ease-spring);
   letter-spacing: -0.01em;
 }
-.panel-tab:first-child { border-radius: 7px 4px 4px 7px; }
-.panel-tab:last-child  { border-radius: 4px 7px 7px 4px; }
+.panel-tab:first-child { border-radius: var(--radius-sm) var(--radius-xs) var(--radius-xs) var(--radius-sm); }
+.panel-tab:last-child  { border-radius: var(--radius-xs) var(--radius-sm) var(--radius-sm) var(--radius-xs); }
 .panel-tab:hover {
   background: var(--surface2);
   border-color: var(--border);
   color: var(--text2);
+  transform: translateY(-1px);
 }
+.panel-tab:active { transform: scale(0.97); }
 .panel-tab:focus-visible {
   outline: none;
   border-color: var(--accent-border);
@@ -866,29 +888,32 @@ onBeforeUnmount(() => {
   width: 13px;
   height: 13px;
   opacity: 0.78;
+  transition: opacity var(--dur-fast), color var(--dur-fast);
 }
 .panel-tab-count {
   min-width: 18px;
   height: 17px;
   padding: 1px 5px;
-  border-radius: 5px;
+  border-radius: var(--radius-xs);
   background: var(--surface3);
   color: var(--text2);
   font-family: var(--font-mono);
   font-size: 10px;
   font-weight: 700;
   line-height: 1.5;
+  transition: background var(--dur-fast), color var(--dur-fast);
 }
 .panel-tab.active .panel-tab-count {
   background: var(--accent-dim);
   color: var(--accent);
+  border: 1px solid var(--accent-border);
 }
 .panel-tab.active {
   background: linear-gradient(180deg, var(--surface3), var(--surface2));
   border-color: var(--border2);
   color: var(--text);
   font-weight: 600;
-  box-shadow: inset 0 1px 0 rgba(255,255,255,0.04), 0 6px 18px rgba(0,0,0,0.18);
+  box-shadow: var(--shadow-sm);
 }
 .panel-tab.active::after {
   content: '';
@@ -899,16 +924,38 @@ onBeforeUnmount(() => {
   height: 2px;
   border-radius: 2px 2px 0 0;
   background: var(--accent);
-  box-shadow: 0 0 12px var(--accent-glow);
+  box-shadow: 0 0 14px var(--accent-glow);
+  transition: left var(--dur-base) var(--ease-out), right var(--dur-base) var(--ease-out);
 }
 .panel-tab.active svg {
   opacity: 1;
   color: var(--accent);
 }
 .panel-tab.ai-tab.active {
-  background: linear-gradient(180deg, rgba(23,207,139,0.13), rgba(23,207,139,0.07));
+  background: linear-gradient(180deg, rgba(30,214,154,0.12), rgba(30,214,154,0.06));
   border-color: var(--accent-border);
   color: var(--text);
+}
+
+/* Panel tab content transition */
+.panel-tab-enter-active {
+  transition: opacity var(--dur-base) var(--ease-out), transform var(--dur-base) var(--ease-out);
+}
+.panel-tab-leave-active {
+  transition: opacity var(--dur-fast) var(--ease-in);
+  position: absolute;
+  inset: 0;
+}
+.panel-tab-enter-from { opacity: 0; transform: translateY(6px); }
+.panel-tab-leave-to   { opacity: 0; }
+
+/* CSS-only fade-in for panel content (used instead of Transition for complex templates) */
+.panel-content-fade {
+  animation: panelFadeIn var(--dur-base) var(--ease-out) both;
+}
+@keyframes panelFadeIn {
+  from { opacity: 0; transform: translateY(5px); }
+  to   { opacity: 1; transform: translateY(0); }
 }
 
 /* Diff content area */
@@ -936,8 +983,8 @@ onBeforeUnmount(() => {
   display: flex;
   overflow: hidden;
   border-left: 1px solid var(--border);
-  background: var(--surface);
-  transition: flex-basis 0.18s ease;
+  background: linear-gradient(180deg, rgba(30,214,154,0.02) 0%, transparent 20%), var(--surface);
+  transition: flex-basis 0.22s var(--ease-out);
 }
 
 .ai-drawer.collapsed {
@@ -948,9 +995,7 @@ onBeforeUnmount(() => {
   width: 42px;
   flex-shrink: 0;
   border-right: 1px solid var(--border);
-  background:
-    linear-gradient(180deg, rgba(255,255,255,0.025), transparent 64%),
-    var(--surface);
+  background: linear-gradient(180deg, var(--surface2), var(--surface));
   display: flex;
   justify-content: center;
   padding-top: 10px;
@@ -960,20 +1005,25 @@ onBeforeUnmount(() => {
   width: 28px;
   height: 28px;
   border: 1px solid var(--accent-border);
-  border-radius: 7px;
+  border-radius: var(--radius-sm);
   background: var(--accent-dim);
   color: var(--accent);
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: background 0.14s, border-color 0.14s, color 0.14s, transform 0.14s;
+  transition: background var(--dur-fast), border-color var(--dur-fast), box-shadow var(--dur-fast), transform var(--dur-fast) var(--ease-spring);
+  animation: glow-pulse 3s ease-in-out infinite;
 }
 
 .ai-drawer-toggle:hover {
-  background: rgba(23,207,139,0.16);
+  background: rgba(30,214,154,0.18);
   border-color: var(--accent);
+  box-shadow: 0 0 16px var(--accent-glow);
+  transform: scale(1.08);
+  animation: none;
 }
+.ai-drawer-toggle:active { transform: scale(0.92); }
 
 .ai-drawer-toggle:focus-visible {
   outline: none;
@@ -990,12 +1040,13 @@ onBeforeUnmount(() => {
   min-width: 0;
   display: flex;
   opacity: 1;
-  transition: opacity 0.12s ease;
+  transition: opacity var(--dur-base) var(--ease-out);
 }
 
 .ai-drawer.collapsed .ai-drawer-body {
   opacity: 0;
   pointer-events: none;
+  transition: opacity var(--dur-fast) var(--ease-in);
 }
 
 .diff-summary {
@@ -1003,7 +1054,7 @@ onBeforeUnmount(() => {
   flex-shrink: 0;
   padding: 10px 16px;
   border-bottom: 1px solid var(--border);
-  background: var(--surface);
+  background: linear-gradient(180deg, var(--surface2) 0%, var(--surface) 100%);
   display: flex;
   align-items: center;
   gap: 14px;
@@ -1026,7 +1077,7 @@ onBeforeUnmount(() => {
   height: 30px;
   padding: 0 11px;
   border: 1px solid var(--accent-border);
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   background: var(--accent-dim);
   color: var(--accent);
   cursor: pointer;
@@ -1038,17 +1089,19 @@ onBeforeUnmount(() => {
   gap: 6px;
   flex-shrink: 0;
   letter-spacing: 0;
-  transition: background 0.12s, border-color 0.12s, box-shadow 0.12s;
+  transition: background var(--dur-fast), border-color var(--dur-fast), box-shadow var(--dur-fast), transform var(--dur-fast) var(--ease-spring);
 }
 
 .ai-review-toggle:hover,
 .ai-review-toggle.active,
 .comments-toggle:hover,
 .comments-toggle.active {
-  background: rgba(23,207,139,0.16);
+  background: rgba(30,214,154,0.16);
   border-color: var(--accent);
-  box-shadow: 0 0 14px var(--accent-glow);
+  box-shadow: 0 0 16px var(--accent-glow);
+  transform: translateY(-1px);
 }
+.ai-review-toggle:active { transform: scale(0.97); }
 
 .ai-review-toggle:focus-visible,
 .comments-toggle:focus-visible {
@@ -1263,7 +1316,7 @@ onBeforeUnmount(() => {
   height: 28px;
   padding: 0 11px;
   border: 1px solid var(--accent-border);
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   background: var(--accent-dim);
   color: var(--accent);
   cursor: pointer;
@@ -1272,7 +1325,7 @@ onBeforeUnmount(() => {
   font-weight: 600;
   letter-spacing: 0;
   flex-shrink: 0;
-  transition: background 0.12s, border-color 0.12s;
+  transition: background var(--dur-fast), border-color var(--dur-fast), transform var(--dur-fast) var(--ease-spring), box-shadow var(--dur-fast);
 }
 
 .mark-reviewed-btn.reviewed {
@@ -1299,13 +1352,18 @@ onBeforeUnmount(() => {
 }
 
 .mark-reviewed-btn:hover:not(:disabled) {
-  background: rgba(23,207,139,0.16);
+  background: rgba(30,214,154,0.16);
   border-color: var(--accent);
+  transform: translateY(-1px);
+  box-shadow: 0 0 14px var(--accent-glow);
 }
+.mark-reviewed-btn:active:not(:disabled) { transform: scale(0.97); }
 
 .mark-reviewed-btn.stale:hover:not(:disabled) {
   background: rgba(201,154,13,0.16);
   border-color: rgba(201,154,13,0.45);
+  transform: translateY(-1px);
+  box-shadow: 0 0 14px rgba(201,154,13,0.18);
 }
 
 .mark-reviewed-btn:disabled {

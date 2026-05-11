@@ -16,42 +16,46 @@
       </button>
     </div>
     <FilterBar />
-    <div class="mr-list" :class="{ 'animate-cards': firstLoad }">
-      <!-- Loading skeletons -->
-      <template v-if="loading">
-        <div class="skeleton-card" v-for="n in 2" :key="n">
-          <div class="skeleton sk-line" :style="{ width: n === 1 ? '40%' : '35%' }"></div>
-          <div class="skeleton sk-title" :style="{ width: n === 1 ? '85%' : '75%' }"></div>
-          <div class="skeleton sk-sub"  :style="{ width: n === 1 ? '55%' : '45%' }"></div>
+    <div class="mr-list">
+      <Transition name="tab-content" mode="out-in">
+        <div :key="filters.activeTab" class="mr-list-inner">
+          <!-- Loading skeletons -->
+          <template v-if="loading">
+            <div class="skeleton-card" v-for="n in 3" :key="n">
+              <div class="skeleton sk-line" :style="{ width: n === 1 ? '40%' : n === 2 ? '35%' : '28%' }"></div>
+              <div class="skeleton sk-title" :style="{ width: n === 1 ? '85%' : n === 2 ? '75%' : '68%' }"></div>
+              <div class="skeleton sk-sub"  :style="{ width: n === 1 ? '55%' : n === 2 ? '45%' : '38%' }"></div>
+            </div>
+          </template>
+
+          <!-- Empty state -->
+          <div v-else-if="filters.filteredMrs.length === 0" class="empty-state">
+            <div class="empty-icon">{{ emptyIcon }}</div>
+            <div class="empty-title">{{ emptyTitle }}</div>
+            <div class="empty-sub" v-html="emptySub"></div>
+          </div>
+
+          <!-- Cards -->
+          <MrCard
+            v-else
+            v-for="(mr, i) in filters.filteredMrs"
+            :key="mr.id"
+            :mr="mr"
+            :index="i"
+            :is-active="mrs.activeMr?.id === mr.id"
+            :approved="mrs.approvedByMe(mr)"
+            :pinned="mrs.isPinned(mr)"
+            :has-repo="mrs.repoCache[mr.project_id] != null"
+            :ai-enabled="aiEnabled"
+            @open="onOpen"
+            @ai-review="onAiReview"
+            @open-in-ide="onOpenInIde"
+            @approve="onApprove"
+            @toggle-pin="onTogglePin"
+            @open-external="onOpenExternal"
+          />
         </div>
-      </template>
-
-      <!-- Empty state -->
-      <div v-else-if="filters.filteredMrs.length === 0" class="empty-state">
-        <div class="empty-icon">{{ emptyIcon }}</div>
-        <div class="empty-title">{{ emptyTitle }}</div>
-        <div class="empty-sub" v-html="emptySub"></div>
-      </div>
-
-      <!-- Cards -->
-      <MrCard
-        v-else
-        v-for="(mr, i) in filters.filteredMrs"
-        :key="mr.id"
-        :mr="mr"
-        :index="i"
-        :is-active="mrs.activeMr?.id === mr.id"
-        :approved="mrs.approvedByMe(mr)"
-        :pinned="mrs.isPinned(mr)"
-        :has-repo="mrs.repoCache[mr.project_id] != null"
-        :ai-enabled="aiEnabled"
-        @open="onOpen"
-        @ai-review="onAiReview"
-        @open-in-ide="onOpenInIde"
-        @approve="onApprove"
-        @toggle-pin="onTogglePin"
-        @open-external="onOpenExternal"
-      />
+      </Transition>
     </div>
   </div>
 </template>
@@ -173,7 +177,7 @@ defineExpose({ clearLoading: () => { loading.value = false; } });
   gap: 3px;
   padding: 8px 10px 7px;
   border-bottom: 1px solid var(--border);
-  background: var(--surface);
+  background: linear-gradient(180deg, var(--surface2) 0%, var(--surface) 100%);
   flex-shrink: 0;
 }
 
@@ -186,7 +190,7 @@ defineExpose({ clearLoading: () => { loading.value = false; } });
   gap: 6px;
   padding: 0 7px;
   border: 1px solid transparent;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   background: transparent;
   color: var(--text3);
   cursor: pointer;
@@ -194,18 +198,21 @@ defineExpose({ clearLoading: () => { loading.value = false; } });
   font-size: 12px;
   font-weight: 600;
   letter-spacing: 0;
-  transition: background 0.12s, border-color 0.12s, color 0.12s;
+  transition: background var(--dur-fast), border-color var(--dur-fast), color var(--dur-fast), transform var(--dur-fast) var(--ease-spring);
 }
 
 .mr-tab:hover {
   background: var(--surface2);
   color: var(--text2);
+  transform: translateY(-1px);
 }
+.mr-tab:active { transform: scale(0.97); }
 
 .mr-tab.active {
-  background: var(--surface2);
+  background: var(--surface3);
   border-color: var(--border2);
   color: var(--text);
+  box-shadow: var(--shadow-sm);
 }
 
 .mr-tab-label {
@@ -218,7 +225,7 @@ defineExpose({ clearLoading: () => { loading.value = false; } });
 .mr-tab-count {
   min-width: 18px;
   padding: 1px 5px;
-  border-radius: 5px;
+  border-radius: var(--radius-xs);
   background: var(--surface3);
   color: var(--text2);
   font-family: var(--font-mono);
@@ -227,11 +234,13 @@ defineExpose({ clearLoading: () => { loading.value = false; } });
   line-height: 1.4;
   text-align: center;
   flex-shrink: 0;
+  transition: background var(--dur-fast), color var(--dur-fast);
 }
 
 .mr-tab.active .mr-tab-count {
   background: var(--accent-dim);
   color: var(--accent);
+  border: 1px solid var(--accent-border);
 }
 
 .mr-tab-count.zero {
@@ -244,8 +253,21 @@ defineExpose({ clearLoading: () => { loading.value = false; } });
   overflow-y: auto;
   scrollbar-gutter: stable;
   padding: 10px;
+  position: relative;
 }
-.mr-list.animate-cards :deep(.mr-card) {
-  animation: fadeSlideIn 0.18s ease both;
+
+.mr-list-inner {
+  display: flex;
+  flex-direction: column;
 }
+
+/* Tab content transition */
+.tab-content-enter-active {
+  transition: opacity 0.16s var(--ease-out), transform 0.18s var(--ease-out);
+}
+.tab-content-leave-active {
+  transition: opacity 0.1s var(--ease-in);
+}
+.tab-content-enter-from { opacity: 0; transform: translateY(6px); }
+.tab-content-leave-to   { opacity: 0; }
 </style>

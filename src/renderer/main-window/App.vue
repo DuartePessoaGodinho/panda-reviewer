@@ -45,40 +45,48 @@
     <div class="layout">
       <!-- Main split -->
       <div class="panel">
-        <SettingsView v-if="showSettings" @close="showSettings = false" />
-        <div v-else class="split">
-          <MrList
-            ref="mrListRef"
-            :ai-enabled="aiEnabled"
-            @open="onMrOpen"
-            @ai-review="onAiReview"
-            @clone-needed="showCloneDialog"
-          />
-          <DiffPanel :ai-enabled="aiEnabled" :provider-label="providerLabel" />
-        </div>
+        <Transition name="slide-right" mode="out-in">
+          <SettingsView v-if="showSettings" key="settings" @close="showSettings = false" />
+          <div v-else key="main" class="split">
+            <MrList
+              ref="mrListRef"
+              :ai-enabled="aiEnabled"
+              @open="onMrOpen"
+              @ai-review="onAiReview"
+              @clone-needed="showCloneDialog"
+            />
+            <DiffPanel :ai-enabled="aiEnabled" :provider-label="providerLabel" />
+          </div>
+        </Transition>
       </div>
     </div>
 
     <!-- Clone dialog -->
-    <div class="overlay" :class="{ hidden: !cloneUrl }" @click.self="cloneUrl = ''">
-      <div class="dialog">
-        <div class="dialog-icon">📦</div>
-        <h3>Project not cloned locally</h3>
-        <p>This project wasn't found in your configured repo folders. Clone it first, then try again.</p>
-        <div class="clone-cmd">git clone {{ cloneUrl }}</div>
-        <div class="dialog-actions">
-          <button class="btn-dialog" @click="cloneUrl = ''">Dismiss</button>
-          <button class="btn-dialog accent" @click="copyClone">{{ cloneCopied ? '✓ Copied!' : 'Copy command' }}</button>
-        </div>
+    <Transition name="overlay-fade">
+      <div v-if="cloneUrl" class="overlay" @click.self="cloneUrl = ''">
+        <Transition name="scale-fade" appear>
+          <div class="dialog" v-if="cloneUrl">
+            <div class="dialog-icon">📦</div>
+            <h3>Project not cloned locally</h3>
+            <p>This project wasn't found in your configured repo folders. Clone it first, then try again.</p>
+            <div class="clone-cmd">git clone {{ cloneUrl }}</div>
+            <div class="dialog-actions">
+              <button class="btn-dialog" @click="cloneUrl = ''">Dismiss</button>
+              <button class="btn-dialog accent" @click="copyClone">{{ cloneCopied ? '✓ Copied!' : 'Copy command' }}</button>
+            </div>
+          </div>
+        </Transition>
       </div>
-    </div>
+    </Transition>
 
     <!-- Toasts -->
     <div class="toast-container">
-      <div v-for="t in toasts" :key="t.id" class="toast" :class="{ out: t.out }">
-        <div class="toast-dot" :class="t.type"></div>
-        <span>{{ t.msg }}</span>
-      </div>
+      <TransitionGroup name="toast" tag="div" class="toast-inner">
+        <div v-for="t in toasts" :key="t.id" class="toast">
+          <div class="toast-dot" :class="t.type"></div>
+          <span>{{ t.msg }}</span>
+        </div>
+      </TransitionGroup>
     </div>
   </div>
 </template>
@@ -122,9 +130,7 @@ function showToast(msg: string, type: Toast['type'] = 'info', duration = 3000) {
   const id = ++toastSeq;
   toasts.value.push({ id, msg, type, out: false });
   setTimeout(() => {
-    const t = toasts.value.find(x => x.id === id);
-    if (t) t.out = true;
-    setTimeout(() => { toasts.value = toasts.value.filter(x => x.id !== id); }, 200);
+    toasts.value = toasts.value.filter(x => x.id !== id);
   }, duration);
 }
 
@@ -235,8 +241,8 @@ onMounted(async () => {
 
 /* ── Titlebar ── */
 .titlebar {
-  height: 38px;
-  background: var(--surface);
+  height: 40px;
+  background: linear-gradient(180deg, var(--surface2) 0%, var(--surface) 100%);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -244,6 +250,17 @@ onMounted(async () => {
   -webkit-app-region: drag;
   border-bottom: 1px solid var(--border);
   flex-shrink: 0;
+  position: relative;
+}
+.titlebar::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--accent-glow2) 30%, var(--accent-glow2) 70%, transparent);
+  opacity: 0.6;
 }
 
 .titlebar-left {
@@ -255,7 +272,7 @@ onMounted(async () => {
 .app-mark {
   width: 22px;
   height: 22px;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   overflow: hidden;
   flex-shrink: 0;
   display: flex;
@@ -270,7 +287,7 @@ onMounted(async () => {
 }
 
 .app-name {
-  font-size: 14px;
+  font-size: 13.5px;
   font-weight: 600;
   color: var(--text2);
   letter-spacing: -0.02em;
@@ -291,20 +308,21 @@ onMounted(async () => {
 }
 
 .titlebar-btn {
-  width: 26px;
-  height: 26px;
+  width: 27px;
+  height: 27px;
   border: none;
   background: transparent;
   color: var(--text3);
   cursor: pointer;
-  border-radius: 5px;
+  border-radius: var(--radius-sm);
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: background 0.12s, color 0.12s;
+  transition: background var(--dur-fast), color var(--dur-fast), transform var(--dur-fast) var(--ease-spring);
 }
-.titlebar-btn:hover { background: var(--surface2); color: var(--text2); }
-.titlebar-btn.active { background: var(--surface2); color: var(--text); }
+.titlebar-btn:hover { background: var(--surface3); color: var(--text2); transform: scale(1.08); }
+.titlebar-btn:active { transform: scale(0.92); }
+.titlebar-btn.active { background: var(--surface3); color: var(--text); }
 .titlebar-btn svg { width: 13px; height: 13px; pointer-events: none; }
 .titlebar-btn.spinning svg { animation: spin 0.75s linear infinite; }
 
@@ -312,7 +330,7 @@ onMounted(async () => {
   display: flex;
   align-items: center;
   gap: 7px;
-  max-width: 140px;
+  max-width: 145px;
   padding: 0 7px;
   color: var(--text3);
   font-family: var(--font-ui);
@@ -321,17 +339,20 @@ onMounted(async () => {
 }
 
 .poll-dot {
-  width: 6px;
-  height: 6px;
+  width: 7px;
+  height: 7px;
   border-radius: 50%;
   background: var(--border2);
   flex-shrink: 0;
-  transition: background 0.3s;
+  transition: background var(--dur-slow), box-shadow var(--dur-slow);
 }
 
-.poll-dot.ok      { background: var(--accent); }
+.poll-dot.ok      {
+  background: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-bg), 0 0 8px var(--accent-glow2);
+}
 .poll-dot.err     { background: var(--red); }
-.poll-dot.loading { background: var(--yellow); animation: pulse 1.2s ease-in-out infinite; }
+.poll-dot.loading { background: var(--yellow); animation: pulse 1.4s ease-in-out infinite; }
 
 .poll-text {
   overflow: hidden;
@@ -350,19 +371,20 @@ onMounted(async () => {
 }
 
 .win-btn {
-  width: 26px;
-  height: 26px;
+  width: 27px;
+  height: 27px;
   border: none;
   background: transparent;
   color: var(--text3);
   cursor: pointer;
-  border-radius: 5px;
+  border-radius: var(--radius-sm);
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: background 0.12s, color 0.12s;
+  transition: background var(--dur-fast), color var(--dur-fast), transform var(--dur-fast) var(--ease-spring);
 }
-.win-btn:hover { background: var(--surface2); color: var(--text2); }
+.win-btn:hover { background: var(--surface3); color: var(--text2); transform: scale(1.08); }
+.win-btn:active { transform: scale(0.92); }
 .win-btn.close:hover { background: rgba(229,83,75,0.15); color: var(--red); }
 .win-btn svg { width: 11px; height: 11px; pointer-events: none; }
 
@@ -371,4 +393,55 @@ onMounted(async () => {
 .panel  { display: flex; flex: 1; overflow: hidden; min-height: 0; }
 .split  { display: flex; flex: 1; overflow: hidden; min-height: 0; }
 
+/* ── Transitions ── */
+.slide-right-enter-active {
+  transition: transform var(--dur-slow) var(--ease-out), opacity var(--dur-base) var(--ease-out);
+}
+.slide-right-leave-active {
+  transition: transform var(--dur-base) var(--ease-in), opacity var(--dur-base) var(--ease-in);
+}
+.slide-right-enter-from { transform: translateX(28px); opacity: 0; }
+.slide-right-leave-to   { transform: translateX(20px); opacity: 0; }
+
+.overlay-fade-enter-active,
+.overlay-fade-leave-active {
+  transition: opacity var(--dur-base) var(--ease-out);
+}
+.overlay-fade-enter-from,
+.overlay-fade-leave-to { opacity: 0; }
+
+.scale-fade-enter-active {
+  transition: transform var(--dur-slow) var(--ease-spring), opacity var(--dur-base) var(--ease-out);
+}
+.scale-fade-leave-active {
+  transition: transform var(--dur-fast) var(--ease-in), opacity var(--dur-fast) var(--ease-in);
+}
+.scale-fade-enter-from { transform: scale(0.92) translateY(8px); opacity: 0; }
+.scale-fade-leave-to   { transform: scale(0.96); opacity: 0; }
+
+/* Toast TransitionGroup */
+.toast-container {
+  position: fixed;
+  bottom: 20px; right: 20px;
+  z-index: 200;
+  pointer-events: none;
+}
+.toast-inner {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  pointer-events: none;
+}
+
+.toast-enter-active {
+  transition: transform var(--dur-base) var(--ease-spring), opacity var(--dur-fast) var(--ease-out);
+}
+.toast-leave-active {
+  transition: transform var(--dur-fast) var(--ease-in), opacity var(--dur-fast) var(--ease-in);
+}
+.toast-enter-from { transform: translateX(18px) scale(0.94); opacity: 0; }
+.toast-leave-to   { transform: translateX(10px) scale(0.96); opacity: 0; }
+.toast-move {
+  transition: transform var(--dur-base) var(--ease-out);
+}
 </style>

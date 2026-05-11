@@ -211,24 +211,44 @@ async function onSave() {
 .settings-root {
   flex: 1; display: flex; flex-direction: column;
   background: var(--bg); overflow: hidden;
+  animation: settingsFadeIn var(--dur-base) var(--ease-out) both;
+}
+@keyframes settingsFadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
 }
 .settings-header {
   display: flex; align-items: center; justify-content: space-between;
   padding: 14px 20px; border-bottom: 1px solid var(--border);
-  background: var(--surface); flex-shrink: 0;
+  background: linear-gradient(180deg, var(--surface2) 0%, var(--surface) 100%);
+  flex-shrink: 0;
 }
 .settings-title { font-size: 16px; font-weight: 700; color: var(--text); }
 .settings-close {
-  width: 26px; height: 26px; border: none; background: transparent;
-  color: var(--text3); cursor: pointer; border-radius: 5px; font-size: 14px;
+  width: 28px; height: 28px; border: none; background: transparent;
+  color: var(--text3); cursor: pointer; border-radius: var(--radius-sm); font-size: 14px;
   display: flex; align-items: center; justify-content: center;
-  transition: background 0.1s, color 0.1s;
+  transition: background var(--dur-fast), color var(--dur-fast), transform var(--dur-fast) var(--ease-spring);
 }
-.settings-close:hover { background: var(--surface2); color: var(--text); }
+.settings-close:hover { background: var(--surface3); color: var(--text); transform: scale(1.1); }
+.settings-close:active { transform: scale(0.9); }
 
 .settings-body { flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 22px; }
 
-.setting-section { display: flex; flex-direction: column; gap: 8px; }
+.setting-section {
+  display: flex; flex-direction: column; gap: 8px;
+  animation: sectionFadeIn var(--dur-base) var(--ease-out) both;
+}
+.setting-section:nth-child(1) { animation-delay: 0.04s; }
+.setting-section:nth-child(2) { animation-delay: 0.08s; }
+.setting-section:nth-child(3) { animation-delay: 0.12s; }
+.setting-section:nth-child(4) { animation-delay: 0.16s; }
+.setting-section:nth-child(5) { animation-delay: 0.20s; }
+.setting-section:nth-child(6) { animation-delay: 0.24s; }
+@keyframes sectionFadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
 .setting-label {
   font-size: 12px; font-weight: 700; color: var(--text2);
   text-transform: uppercase; letter-spacing: 0.05em;
@@ -246,7 +266,7 @@ async function onSave() {
 .setting-link:hover { text-decoration: underline; }
 
 .setting-input {
-  width: 100%; padding: 8px 10px; border-radius: 6px;
+  width: 100%; padding: 8px 10px; border-radius: var(--radius-sm);
   border: 1px solid var(--border2); background: var(--surface);
   color: var(--text); font-size: 13px; outline: none;
   font-family: monospace; transition: border-color 0.15s;
