@@ -146,11 +146,13 @@ async function onRefresh() {
 function onMrOpen(mr: MR) {
   mrs.setActiveMr(mr);
   mrs.setActivePanelTab('diff');
+  mrs.setAiDrawerOpen(ai.running && ai.reviewingMr?.id === mr.id);
 }
 
 function onAiReview(mr: MR) {
   mrs.setActiveMr(mr);
   mrs.setActivePanelTab('ai');
+  mrs.setAiDrawerOpen(true);
 }
 
 function showCloneDialog(url: string) { cloneUrl.value = url; }
@@ -194,6 +196,8 @@ onMounted(async () => {
   window.api.onSettingsUpdated((s: any) => {
     aiEnabled.value  = s.aiReviewEnabled ?? true;
     aiProvider.value = s.aiReviewProvider ?? 'claude';
+    mrs.clearRepoCache();
+    prefetchRepoPaths(mrs.uniqueOpenMrs);
   });
 
   window.api.onShowSettings(() => { showSettings.value = true; });
@@ -205,6 +209,10 @@ onMounted(async () => {
     const entry = ai.finishReview();
     if (!mr) return;
     await window.api.saveReviewEntry(mr.id, entry);
+    if (mrs.activeMr?.id === mr.id) {
+      mrs.setAiDrawerOpen(true);
+      mrs.setActivePanelTab('ai');
+    }
     if (mrs.activeMr?.id !== mr.id || mrs.activePanelTab !== 'ai') {
       showToast(`✦ AI Review complete: ${mr.title.slice(0, 45)}${mr.title.length > 45 ? '…' : ''}`, 'ok', 6000);
     }

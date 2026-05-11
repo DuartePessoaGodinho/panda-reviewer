@@ -1,10 +1,11 @@
-import type { AiReviewProvider, ReviewEntry } from './types';
+import type { AiReviewProvider, ReviewCheckpoint, ReviewEntry } from './types';
 
 interface ElectronAPI {
   getSettings: () => Promise<any>;
   saveSettings: (s: any) => Promise<any>;
   getMrs: () => Promise<{ toReview: any[]; myMrs: any[]; currentUserId: number | null }>;
   getMrDiff: (projectId: number, mrIid: number) => Promise<any>;
+  getNewChangesDiff: (projectId: number, fromSha: string, toSha: string) => Promise<any>;
   openInIde: (url: string) => Promise<{ found: boolean; cloneUrl?: string }>;
   openExternal: (url: string) => void;
   pickFolder: () => Promise<string | null>;
@@ -26,6 +27,8 @@ interface ElectronAPI {
   getReviewHistory: (mrId: number) => Promise<ReviewEntry[]>;
   saveReviewEntry: (mrId: number, entry: ReviewEntry) => Promise<void>;
   updateReviewNotes: (mrId: number, entryId: string, notes: string) => Promise<void>;
+  getReviewCheckpoint: (mrId: number) => Promise<ReviewCheckpoint | null>;
+  saveReviewCheckpoint: (checkpoint: ReviewCheckpoint) => Promise<ReviewCheckpoint>;
   onClaudeChunk: (cb: (text: string) => void) => void;
   onClaudeDone:  (cb: () => void) => void;
   onClaudeError: (cb: (msg: string) => void) => void;

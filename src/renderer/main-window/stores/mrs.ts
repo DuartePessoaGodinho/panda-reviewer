@@ -25,6 +25,7 @@ export const useMrsStore = defineStore('mrs', () => {
   const myMrs = ref<MR[]>([]);
   const activeMr = ref<MR | null>(null);
   const activePanelTab = ref<'diff' | 'ai'>('diff');
+  const aiDrawerOpen = ref(false);
   const currentUserId = ref<number | null>(null);
   const locallyApproved = ref(new Set<number>());
   const repoCache = ref<Record<number, string | null>>({});
@@ -69,6 +70,10 @@ export const useMrsStore = defineStore('mrs', () => {
     activePanelTab.value = tab;
   }
 
+  function setAiDrawerOpen(open: boolean) {
+    aiDrawerOpen.value = open;
+  }
+
   function update(data: { toReview: MR[]; myMrs: MR[]; currentUserId: number | null }) {
     toReviewMrs.value = data.toReview;
     myMrs.value = data.myMrs;
@@ -79,11 +84,16 @@ export const useMrsStore = defineStore('mrs', () => {
     repoCache.value[projectId] = path;
   }
 
+  function clearRepoCache() {
+    repoCache.value = {};
+  }
+
   return {
     toReviewMrs,
     myMrs,
     activeMr,
     activePanelTab,
+    aiDrawerOpen,
     currentUserId,
     locallyApproved,
     repoCache,
@@ -98,7 +108,9 @@ export const useMrsStore = defineStore('mrs', () => {
     togglePinned,
     setActiveMr,
     setActivePanelTab,
+    setAiDrawerOpen,
     update,
     setRepoCache,
+    clearRepoCache,
   };
 });

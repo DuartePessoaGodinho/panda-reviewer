@@ -6,6 +6,17 @@ export interface ReviewEntry {
   notes: string;
 }
 
+export interface ReviewCheckpoint {
+  mrId: number;
+  projectId: number;
+  mrIid: number;
+  sourceBranch: string;
+  targetBranch: string;
+  sourceSha: string;
+  reviewedAt: string;
+  kind: 'manual' | 'ai' | 'approve';
+}
+
 export type AiReviewProvider = 'claude' | 'copilot' | 'codex';
 
 export interface MR {

@@ -10,7 +10,7 @@ import {
 } from 'electron';
 import { autoUpdater } from 'electron-updater';
 import * as path from 'path';
-import { getSettings, saveSettings, isConfigured, getReviewContext, saveReviewContext, pruneOldReviewContexts, getReviewHistory, saveReviewEntry, updateReviewNotes, pruneOldReviewHistory, ReviewEntry } from './settings';
+import { getSettings, saveSettings, isConfigured, getReviewContext, saveReviewContext, pruneOldReviewContexts, getReviewHistory, saveReviewEntry, updateReviewNotes, pruneOldReviewHistory, ReviewEntry, getReviewCheckpoint, saveReviewCheckpoint, ReviewCheckpoint } from './settings';
 import { GitLabService, MergeRequest } from './gitlab';
 import { startPolling, stopPolling, resetPolling, setUpdateCallback, getDebugState, setWindowFocus, getCurrentUserId } from './polling';
 import { findLocalRepo, buildRepoCache } from './localRepo';
@@ -115,6 +115,12 @@ ipcMain.handle('get-mr-diff', async (_e, projectId: number, mrIid: number) => {
   const { gitlabToken, gitlabUrl } = getSettings();
   const svc = new GitLabService(gitlabUrl, gitlabToken);
   return svc.getMrChanges(projectId, mrIid);
+});
+
+ipcMain.handle('get-new-changes-diff', async (_e, projectId: number, fromSha: string, toSha: string) => {
+  const { gitlabToken, gitlabUrl } = getSettings();
+  const svc = new GitLabService(gitlabUrl, gitlabToken);
+  return svc.getCompareChanges(projectId, fromSha, toSha);
 });
 
 ipcMain.handle('open-in-ide', (_e, projectHttpUrl: string) => {
@@ -254,6 +260,8 @@ ipcMain.handle('save-review-context', (_e, mrId: number, text: string) => saveRe
 ipcMain.handle('get-review-history',   (_e, mrId: number) => getReviewHistory(mrId));
 ipcMain.handle('save-review-entry',    (_e, mrId: number, entry: ReviewEntry) => saveReviewEntry(mrId, entry));
 ipcMain.handle('update-review-notes',  (_e, mrId: number, entryId: string, notes: string) => updateReviewNotes(mrId, entryId, notes));
+ipcMain.handle('get-review-checkpoint', (_e, mrId: number) => getReviewCheckpoint(mrId));
+ipcMain.handle('save-review-checkpoint', (_e, checkpoint: ReviewCheckpoint) => saveReviewCheckpoint(checkpoint));
 
 // ─────────────────────────────────────────────────────────────────────────
 

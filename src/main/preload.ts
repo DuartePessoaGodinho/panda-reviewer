@@ -6,6 +6,8 @@ contextBridge.exposeInMainWorld('api', {
   getMrs: () => ipcRenderer.invoke('get-mrs'),
   getMrDiff: (projectId: number, mrIid: number) =>
     ipcRenderer.invoke('get-mr-diff', projectId, mrIid),
+  getNewChangesDiff: (projectId: number, fromSha: string, toSha: string) =>
+    ipcRenderer.invoke('get-new-changes-diff', projectId, fromSha, toSha),
   openInIde: (projectHttpUrl: string) => ipcRenderer.invoke('open-in-ide', projectHttpUrl),
   openExternal: (url: string) => ipcRenderer.invoke('open-external', url),
   pickFolder: () => ipcRenderer.invoke('pick-folder'),
@@ -27,6 +29,8 @@ contextBridge.exposeInMainWorld('api', {
   getReviewHistory: (mrId: number) => ipcRenderer.invoke('get-review-history', mrId),
   saveReviewEntry: (mrId: number, entry: unknown) => ipcRenderer.invoke('save-review-entry', mrId, entry),
   updateReviewNotes: (mrId: number, entryId: string, notes: string) => ipcRenderer.invoke('update-review-notes', mrId, entryId, notes),
+  getReviewCheckpoint: (mrId: number) => ipcRenderer.invoke('get-review-checkpoint', mrId),
+  saveReviewCheckpoint: (checkpoint: unknown) => ipcRenderer.invoke('save-review-checkpoint', checkpoint),
   onClaudeChunk: (cb: (text: string) => void) => ipcRenderer.on('claude-chunk', (_e, t) => cb(t)),
   onClaudeDone:  (cb: () => void)             => ipcRenderer.on('claude-done',  () => cb()),
   onClaudeError: (cb: (msg: string) => void)  => ipcRenderer.on('claude-error', (_e, m) => cb(m)),

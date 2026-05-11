@@ -12,13 +12,13 @@
       <p>Click a merge request to view its diff,<br>or run an AI Review.</p>
     </div>
 
-    <!-- Panel tab bar -->
+    <!-- Detail workspace -->
     <template v-else>
-      <div class="panel-tabs">
+      <div v-if="isCompact" class="panel-tabs">
         <button
           class="panel-tab"
           :class="{ active: mrs.activePanelTab === 'diff' }"
-          @click="mrs.setActivePanelTab('diff')"
+          @click="showDiff"
         >
           <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
             <path d="M14 1H2a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V2a1 1 0 0 0-1-1zM2 0a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V2a2 2 0 0 0-2-2H2z"/>
@@ -29,7 +29,7 @@
         <button
           class="panel-tab ai-tab"
           :class="{ active: mrs.activePanelTab === 'ai' }"
-          @click="mrs.setActivePanelTab('ai')"
+          @click="toggleAiReview"
         >
           <svg width="11" height="11" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
             <path d="M8 0l1.5 5H16l-4.5 3.5L13 14 8 10l-5 4 1.5-5.5L0 5h6.5L8 0z"/>
@@ -38,78 +38,232 @@
         </button>
       </div>
 
-      <!-- Diff view -->
-      <div v-if="mrs.activePanelTab === 'diff'" class="diff-content-wrap">
-        <div v-if="loadingDiff" class="diff-placeholder">
-          <div class="diff-placeholder-icon loading">
-            <svg width="22" height="22" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
-              <path d="M8 3a5 5 0 1 0 4.546 2.914.5.5 0 0 1 .908-.417A6 6 0 1 1 8 2v1z"/>
-              <path d="M8 4.466V.534a.25.25 0 0 1 .41-.192l2.36 1.966c.12.1.12.284 0 .384L8.41 4.658A.25.25 0 0 1 8 4.466z"/>
-            </svg>
-          </div>
-          <strong class="diff-placeholder-title">Loading diff…</strong>
-        </div>
-        <div v-else-if="diffError" class="diff-placeholder">
-          <div class="diff-placeholder-icon">⚠</div>
-          <strong class="diff-placeholder-title">Failed to load diff</strong>
-          <p>Check your connection and try again.</p>
-        </div>
-        <template v-else>
-          <div class="diff-summary">
-            <div class="diff-title" :title="mrs.activeMr.title">{{ mrs.activeMr.title }}</div>
-            <div class="diff-meta">
-              <span class="diff-stat files">
-                <span class="diff-stat-value">{{ diffStats.files }}</span>
-                <span class="diff-stat-label">files</span>
-              </span>
-              <span class="diff-stat total">
-                <span class="diff-stat-value">{{ changedLines }}</span>
-                <span class="diff-stat-label">changed</span>
-              </span>
-              <span class="diff-stat add">
-                <span class="diff-stat-value">+{{ diffStats.added }}</span>
-                <span class="diff-stat-label">added</span>
-              </span>
-              <span class="diff-stat del">
-                <span class="diff-stat-value">-{{ diffStats.deleted }}</span>
-                <span class="diff-stat-label">deleted</span>
-              </span>
-            </div>
-          </div>
-          <div
-            class="diff-content"
-            @click="handleDiffContentClick"
-            @keydown="handleDiffContentKeydown"
-            v-html="diffHtml"
-          ></div>
-        </template>
-      </div>
-
-      <!-- AI panel -->
       <AiPanel
-        v-else
+        v-if="isCompact && mrs.activePanelTab === 'ai'"
         :mr="mrs.activeMr"
         :ai-enabled="props.aiEnabled"
         :provider-label="props.providerLabel"
       />
+
+      <div v-else class="review-workspace">
+        <div class="diff-content-wrap">
+          <div v-if="loadingDiff" class="diff-placeholder">
+            <div class="diff-placeholder-icon loading">
+              <svg width="22" height="22" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+                <path d="M8 3a5 5 0 1 0 4.546 2.914.5.5 0 0 1 .908-.417A6 6 0 1 1 8 2v1z"/>
+                <path d="M8 4.466V.534a.25.25 0 0 1 .41-.192l2.36 1.966c.12.1.12.284 0 .384L8.41 4.658A.25.25 0 0 1 8 4.466z"/>
+              </svg>
+            </div>
+            <strong class="diff-placeholder-title">Loading diff…</strong>
+          </div>
+          <div v-else-if="diffError" class="diff-placeholder">
+            <div class="diff-placeholder-icon">⚠</div>
+            <strong class="diff-placeholder-title">Failed to load diff</strong>
+            <p>Check your connection and try again.</p>
+          </div>
+          <template v-else>
+            <div class="diff-summary">
+              <div class="diff-title" :title="mrs.activeMr.title">{{ mrs.activeMr.title }}</div>
+              <button
+                v-if="!isCompact"
+                class="ai-review-toggle"
+                :class="{ active: mrs.aiDrawerOpen }"
+                :title="mrs.aiDrawerOpen ? 'Collapse AI Review' : 'Open AI Review beside the diff'"
+                :aria-expanded="mrs.aiDrawerOpen"
+                @click="toggleAiReview"
+              >
+                <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+                  <path d="M8 0l1.5 5H16l-4.5 3.5L13 14 8 10l-5 4 1.5-5.5L0 5h6.5L8 0z"/>
+                </svg>
+                AI Review
+              </button>
+              <div class="diff-meta">
+                <span class="diff-stat files">
+                  <span class="diff-stat-value">{{ diffStats.files }}</span>
+                  <span class="diff-stat-label">files</span>
+                </span>
+                <span class="diff-stat total">
+                  <span class="diff-stat-value">{{ changedLines }}</span>
+                  <span class="diff-stat-label">changed</span>
+                </span>
+                <span class="diff-stat add">
+                  <span class="diff-stat-value">+{{ diffStats.added }}</span>
+                  <span class="diff-stat-label">added</span>
+                </span>
+                <span class="diff-stat del">
+                  <span class="diff-stat-value">-{{ diffStats.deleted }}</span>
+                  <span class="diff-stat-label">deleted</span>
+                </span>
+              </div>
+            </div>
+            <div
+              class="review-checkpoint-bar"
+              :class="{
+                reviewed: isCurrentHeadReviewed,
+                stale: hasNewChanges,
+              }"
+            >
+              <div class="diff-mode-tabs" role="tablist" aria-label="Diff range">
+                <button
+                  class="diff-mode-tab"
+                  :class="{ active: diffMode === 'full' }"
+                  role="tab"
+                  :aria-selected="diffMode === 'full'"
+                  @click="diffMode = 'full'"
+                >
+                  Full diff
+                </button>
+                <button
+                  class="diff-mode-tab"
+                  :class="{ active: diffMode === 'new' }"
+                  :disabled="!hasNewChanges"
+                  role="tab"
+                  :aria-selected="diffMode === 'new'"
+                  :title="newChangesTitle"
+                  @click="diffMode = 'new'"
+                >
+                  New changes
+                </button>
+              </div>
+              <div class="checkpoint-status">
+                <template v-if="checkpoint">
+                  <span class="checkpoint-state-dot"></span>
+                  <span v-if="isCurrentHeadReviewed" class="checkpoint-reviewed-label">Reviewed</span>
+                  <span v-else class="checkpoint-stale-label">New changes since review</span>
+                  <span class="checkpoint-detail">{{ checkpointAge }} at {{ shortSha(checkpoint.sourceSha) }}</span>
+                  <span v-if="hasNewChanges" class="checkpoint-new">new head {{ shortSha(currentSha) }}</span>
+                </template>
+                <template v-else>
+                  Not marked reviewed in Panda
+                </template>
+              </div>
+              <button
+                class="mark-reviewed-btn"
+                :class="{ reviewed: isCurrentHeadReviewed, stale: hasNewChanges }"
+                :disabled="!currentSha || markingReviewed || isCurrentHeadReviewed"
+                :title="currentSha ? 'Use the current MR head as the reviewed checkpoint' : 'Current MR head is unavailable'"
+                @click="markReviewed"
+              >
+                {{ markReviewedLabel }}
+              </button>
+            </div>
+            <div
+              class="diff-content"
+              @click="handleDiffContentClick"
+              @keydown="handleDiffContentKeydown"
+              v-html="diffHtml"
+            ></div>
+          </template>
+        </div>
+
+        <aside
+          v-if="!isCompact"
+          class="ai-drawer"
+          :class="{ collapsed: !mrs.aiDrawerOpen }"
+          :aria-hidden="!mrs.aiDrawerOpen"
+        >
+          <div class="ai-drawer-rail">
+            <button
+              class="ai-drawer-toggle"
+              :title="mrs.aiDrawerOpen ? 'Collapse AI Review' : 'Expand AI Review'"
+              :aria-label="mrs.aiDrawerOpen ? 'Collapse AI Review' : 'Expand AI Review'"
+              :aria-expanded="mrs.aiDrawerOpen"
+              @click="mrs.setAiDrawerOpen(!mrs.aiDrawerOpen)"
+            >
+              <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+                <path d="M8 0l1.5 5H16l-4.5 3.5L13 14 8 10l-5 4 1.5-5.5L0 5h6.5L8 0z"/>
+              </svg>
+            </button>
+          </div>
+          <div class="ai-drawer-body" :inert="!mrs.aiDrawerOpen">
+            <AiPanel
+              :mr="mrs.activeMr"
+              :ai-enabled="props.aiEnabled"
+              :provider-label="props.providerLabel"
+            />
+          </div>
+        </aside>
+      </div>
     </template>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useMrsStore } from '../stores/mrs';
+import type { ReviewCheckpoint } from '../../types';
 import * as Diff2Html from 'diff2html';
 import AiPanel from './AiPanel/index.vue';
 
 const props = defineProps<{ aiEnabled: boolean; providerLabel: string }>();
+
+type DiffMode = 'full' | 'new';
 
 const mrs = useMrsStore();
 const loadingDiff = ref(false);
 const diffError   = ref(false);
 const diffHtml    = ref('');
 const diffStats   = ref({ files: 0, added: 0, deleted: 0 });
+const diffMode    = ref<DiffMode>('full');
+const checkpoint  = ref<ReviewCheckpoint | null>(null);
+const markingReviewed = ref(false);
+const isCompact = ref(false);
+let compactQuery: MediaQueryList | null = null;
 const changedLines = computed(() => diffStats.value.added + diffStats.value.deleted);
+const currentSha = computed(() => mrs.activeMr?.sha ?? '');
+const shouldShowDiff = computed(() =>
+  Boolean(mrs.activeMr && (!isCompact.value || mrs.activePanelTab === 'diff'))
+);
+const hasNewChanges = computed(() =>
+  Boolean(checkpoint.value?.sourceSha && currentSha.value && checkpoint.value.sourceSha !== currentSha.value)
+);
+const isCurrentHeadReviewed = computed(() =>
+  Boolean(checkpoint.value?.sourceSha && currentSha.value && checkpoint.value.sourceSha === currentSha.value)
+);
+const markReviewedLabel = computed(() => {
+  if (markingReviewed.value) return 'Saving...';
+  if (isCurrentHeadReviewed.value) return 'Reviewed';
+  if (hasNewChanges.value) return 'Mark new changes reviewed';
+  return 'Mark reviewed';
+});
+const checkpointAge = computed(() => {
+  if (!checkpoint.value) return '';
+  return new Date(checkpoint.value.reviewedAt).toLocaleString([], {
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+});
+const newChangesTitle = computed(() => {
+  if (!checkpoint.value) return 'Mark this MR reviewed before tracking new changes';
+  if (!currentSha.value) return 'Current MR head is unavailable';
+  if (!hasNewChanges.value) return 'No new commits since your last Panda review';
+  return `Show changes from ${shortSha(checkpoint.value.sourceSha)} to ${shortSha(currentSha.value)}`;
+});
+
+function shortSha(sha: string) {
+  return sha ? sha.slice(0, 8) : '';
+}
+
+function showDiff() {
+  mrs.setActivePanelTab('diff');
+  if (!isCompact.value) mrs.setAiDrawerOpen(false);
+}
+
+function toggleAiReview() {
+  if (!isCompact.value) {
+    const nextOpen = !mrs.aiDrawerOpen;
+    mrs.setAiDrawerOpen(nextOpen);
+    mrs.setActivePanelTab(nextOpen ? 'ai' : 'diff');
+    return;
+  }
+  mrs.setActivePanelTab('ai');
+}
+
+function updateCompactState(event: MediaQueryListEvent | MediaQueryList) {
+  isCompact.value = event.matches;
+}
 
 function makeDiffFilesCollapsible(html: string) {
   const doc = new DOMParser().parseFromString(`<div>${html}</div>`, 'text/html');
@@ -158,6 +312,86 @@ function findToggleFile(target: HTMLElement | null) {
   return control?.closest('.d2h-file-wrapper') ?? null;
 }
 
+function parseDiffStats(diff: string) {
+  const files = (diff.match(/^diff --git /gm) ?? []).length;
+  return {
+    files,
+    added: (diff.match(/^\+(?!\+\+)/gm) ?? []).length,
+    deleted: (diff.match(/^-(?!--)/gm) ?? []).length,
+  };
+}
+
+function renderDiff(diff: string) {
+  diffStats.value = parseDiffStats(diff);
+  diffHtml.value = makeDiffFilesCollapsible(Diff2Html.html(diff, {
+    drawFileList: true,
+    outputFormat: 'line-by-line',
+    renderNothingWhenEmpty: false,
+  }));
+}
+
+function fullDiffFromChanges(changes: any[]) {
+  return changes
+    .map((c: any) => `diff --git a/${c.old_path} b/${c.new_path}\n--- a/${c.old_path}\n+++ b/${c.new_path}\n${c.diff}`)
+    .join('\n');
+}
+
+async function loadDiff() {
+  const mr = mrs.activeMr;
+  if (!mr || !shouldShowDiff.value) return;
+
+  loadingDiff.value = true;
+  diffError.value   = false;
+  diffHtml.value    = '';
+  diffStats.value   = { files: 0, added: 0, deleted: 0 };
+
+  try {
+    if (diffMode.value === 'new') {
+      if (!checkpoint.value || !hasNewChanges.value) {
+        diffMode.value = 'full';
+      } else {
+        const { changes } = await window.api.getNewChangesDiff(mr.project_id, checkpoint.value.sourceSha, currentSha.value);
+        renderDiff(fullDiffFromChanges(changes));
+        return;
+      }
+    }
+
+    const { changes } = await window.api.getMrDiff(mr.project_id, mr.iid);
+    renderDiff(fullDiffFromChanges(changes));
+  } catch {
+    diffError.value = true;
+  } finally {
+    loadingDiff.value = false;
+  }
+}
+
+async function loadCheckpoint(mrId: number) {
+  checkpoint.value = await window.api.getReviewCheckpoint(mrId);
+  if (!hasNewChanges.value) diffMode.value = 'full';
+}
+
+async function markReviewed() {
+  const mr = mrs.activeMr;
+  if (!mr?.sha || markingReviewed.value) return;
+
+  markingReviewed.value = true;
+  try {
+    checkpoint.value = await window.api.saveReviewCheckpoint({
+      mrId: mr.id,
+      projectId: mr.project_id,
+      mrIid: mr.iid,
+      sourceBranch: mr.source_branch,
+      targetBranch: mr.target_branch,
+      sourceSha: mr.sha,
+      reviewedAt: new Date().toISOString(),
+      kind: 'manual',
+    });
+    diffMode.value = 'full';
+  } finally {
+    markingReviewed.value = false;
+  }
+}
+
 function handleDiffContentClick(event: MouseEvent) {
   const file = findToggleFile(event.target as HTMLElement | null);
   if (!file) return;
@@ -177,36 +411,38 @@ function handleDiffContentKeydown(event: KeyboardEvent) {
 }
 
 watch(
-  () => [mrs.activeMr, mrs.activePanelTab] as const,
-  async ([mr, tab]) => {
-    if (!mr || tab !== 'diff') return;
-    loadingDiff.value = true;
-    diffError.value   = false;
-    diffHtml.value    = '';
-    diffStats.value   = { files: 0, added: 0, deleted: 0 };
-    try {
-      const { changes } = await window.api.getMrDiff(mr.project_id, mr.iid);
-      diffStats.value = {
-        files: changes.length,
-        added: changes.reduce((n: number, c: any) => n + (c.diff.match(/^\+(?!\+\+)/gm) ?? []).length, 0),
-        deleted: changes.reduce((n: number, c: any) => n + (c.diff.match(/^-(?!--)/gm) ?? []).length, 0),
-      };
-      const combined = changes
-        .map((c: any) => `diff --git a/${c.old_path} b/${c.new_path}\n--- a/${c.old_path}\n+++ b/${c.new_path}\n${c.diff}`)
-        .join('\n');
-      diffHtml.value = makeDiffFilesCollapsible(Diff2Html.html(combined, {
-        drawFileList: true,
-        outputFormat: 'line-by-line',
-        renderNothingWhenEmpty: false,
-      }));
-    } catch {
-      diffError.value = true;
-    } finally {
-      loadingDiff.value = false;
-    }
+  () => [mrs.activeMr?.id, mrs.activeMr?.sha, shouldShowDiff.value] as const,
+  async ([mrId, _sha, canShowDiff]) => {
+    if (!mrId || !canShowDiff) return;
+    await loadCheckpoint(mrId);
+    await loadDiff();
   },
   { immediate: true }
 );
+
+watch(
+  () => diffMode.value,
+  async () => {
+    await loadDiff();
+  }
+);
+
+watch(
+  () => hasNewChanges.value,
+  (available) => {
+    if (!available && diffMode.value === 'new') diffMode.value = 'full';
+  }
+);
+
+onMounted(() => {
+  compactQuery = window.matchMedia('(max-width: 1180px)');
+  updateCompactState(compactQuery);
+  compactQuery.addEventListener('change', updateCompactState);
+});
+
+onBeforeUnmount(() => {
+  compactQuery?.removeEventListener('change', updateCompactState);
+});
 </script>
 
 <style scoped>
@@ -328,7 +564,90 @@ watch(
 }
 
 /* Diff content area */
-.diff-content-wrap { flex: 1; overflow: hidden; display: flex; flex-direction: column; }
+.review-workspace {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  background: var(--bg);
+}
+
+.diff-content-wrap {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.ai-drawer {
+  position: relative;
+  flex: 0 0 clamp(380px, 34vw, 460px);
+  min-width: 0;
+  display: flex;
+  overflow: hidden;
+  border-left: 1px solid var(--border);
+  background: var(--surface);
+  transition: flex-basis 0.18s ease;
+}
+
+.ai-drawer.collapsed {
+  flex-basis: 42px;
+}
+
+.ai-drawer-rail {
+  width: 42px;
+  flex-shrink: 0;
+  border-right: 1px solid var(--border);
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.025), transparent 64%),
+    var(--surface);
+  display: flex;
+  justify-content: center;
+  padding-top: 10px;
+}
+
+.ai-drawer-toggle {
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--accent-border);
+  border-radius: 7px;
+  background: var(--accent-dim);
+  color: var(--accent);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.14s, border-color 0.14s, color 0.14s, transform 0.14s;
+}
+
+.ai-drawer-toggle:hover {
+  background: rgba(23,207,139,0.16);
+  border-color: var(--accent);
+}
+
+.ai-drawer-toggle:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--accent-bg);
+}
+
+.ai-drawer-toggle svg {
+  width: 13px;
+  height: 13px;
+}
+
+.ai-drawer-body {
+  width: calc(clamp(380px, 34vw, 460px) - 42px);
+  min-width: 0;
+  display: flex;
+  opacity: 1;
+  transition: opacity 0.12s ease;
+}
+
+.ai-drawer.collapsed .ai-drawer-body {
+  opacity: 0;
+  pointer-events: none;
+}
 
 .diff-summary {
   min-height: 44px;
@@ -351,6 +670,43 @@ watch(
   font-size: 14px;
   font-weight: 600;
   letter-spacing: -0.02em;
+}
+
+.ai-review-toggle {
+  height: 30px;
+  padding: 0 11px;
+  border: 1px solid var(--accent-border);
+  border-radius: 6px;
+  background: var(--accent-dim);
+  color: var(--accent);
+  cursor: pointer;
+  font-family: var(--font-ui);
+  font-size: 12px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  letter-spacing: 0;
+  transition: background 0.12s, border-color 0.12s, box-shadow 0.12s;
+}
+
+.ai-review-toggle:hover,
+.ai-review-toggle.active {
+  background: rgba(23,207,139,0.16);
+  border-color: var(--accent);
+  box-shadow: 0 0 14px var(--accent-glow);
+}
+
+.ai-review-toggle:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--accent-bg);
+}
+
+.ai-review-toggle svg {
+  width: 12px;
+  height: 12px;
+  flex-shrink: 0;
 }
 
 .diff-meta {
@@ -423,6 +779,184 @@ watch(
 
 .diff-stat.del .diff-stat-value {
   color: var(--red);
+}
+
+.review-checkpoint-bar {
+  min-height: 42px;
+  flex-shrink: 0;
+  padding: 7px 14px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.review-checkpoint-bar.reviewed {
+  background:
+    linear-gradient(90deg, rgba(23,207,139,0.08), transparent 42%),
+    var(--surface);
+}
+
+.review-checkpoint-bar.stale {
+  background:
+    linear-gradient(90deg, rgba(201,154,13,0.1), transparent 45%),
+    var(--surface);
+}
+
+.diff-mode-tabs {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--bg);
+  flex-shrink: 0;
+}
+
+.diff-mode-tab {
+  height: 26px;
+  min-width: 86px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--text3);
+  cursor: pointer;
+  font-family: var(--font-ui);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0;
+  transition: background 0.12s, color 0.12s;
+}
+
+.diff-mode-tab:hover:not(:disabled) {
+  color: var(--text2);
+  background: var(--surface2);
+}
+
+.diff-mode-tab.active {
+  color: var(--text);
+  background: var(--surface2);
+}
+
+.diff-mode-tab:disabled {
+  opacity: 0.36;
+  cursor: not-allowed;
+}
+
+.checkpoint-status {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text3);
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.checkpoint-state-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--text3);
+  flex-shrink: 0;
+}
+
+.review-checkpoint-bar.reviewed .checkpoint-state-dot {
+  background: var(--accent);
+  box-shadow: 0 0 10px var(--accent-glow);
+}
+
+.review-checkpoint-bar.stale .checkpoint-state-dot {
+  background: var(--yellow);
+  box-shadow: 0 0 10px rgba(201,154,13,0.18);
+}
+
+.checkpoint-reviewed-label,
+.checkpoint-stale-label {
+  color: var(--text);
+  font-weight: 700;
+  letter-spacing: 0;
+  flex-shrink: 0;
+}
+
+.checkpoint-reviewed-label {
+  color: var(--accent);
+}
+
+.checkpoint-stale-label {
+  color: var(--yellow);
+}
+
+.checkpoint-detail {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.checkpoint-new {
+  color: var(--accent);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  flex-shrink: 0;
+}
+
+.mark-reviewed-btn {
+  height: 28px;
+  padding: 0 11px;
+  border: 1px solid var(--accent-border);
+  border-radius: 6px;
+  background: var(--accent-dim);
+  color: var(--accent);
+  cursor: pointer;
+  font-family: var(--font-ui);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0;
+  flex-shrink: 0;
+  transition: background 0.12s, border-color 0.12s;
+}
+
+.mark-reviewed-btn.reviewed {
+  background: rgba(23,207,139,0.12);
+  border-color: var(--accent-border);
+  color: var(--accent);
+}
+
+.mark-reviewed-btn.reviewed::before {
+  content: "";
+  width: 7px;
+  height: 4px;
+  border: solid currentColor;
+  border-width: 0 0 2px 2px;
+  display: inline-block;
+  transform: translateY(-1px) rotate(-45deg);
+  margin-right: 7px;
+}
+
+.mark-reviewed-btn.stale {
+  background: rgba(201,154,13,0.1);
+  border-color: rgba(201,154,13,0.28);
+  color: var(--yellow);
+}
+
+.mark-reviewed-btn:hover:not(:disabled) {
+  background: rgba(23,207,139,0.16);
+  border-color: var(--accent);
+}
+
+.mark-reviewed-btn.stale:hover:not(:disabled) {
+  background: rgba(201,154,13,0.16);
+  border-color: rgba(201,154,13,0.45);
+}
+
+.mark-reviewed-btn:disabled {
+  opacity: 0.82;
+  cursor: not-allowed;
 }
 
 .diff-content {

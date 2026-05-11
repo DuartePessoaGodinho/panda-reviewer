@@ -14,6 +14,17 @@ export interface ReviewEntry {
   notes: string;
 }
 
+export interface ReviewCheckpoint {
+  mrId: number;
+  projectId: number;
+  mrIid: number;
+  sourceBranch: string;
+  targetBranch: string;
+  sourceSha: string;
+  reviewedAt: string;
+  kind: 'manual' | 'ai' | 'approve';
+}
+
 export interface AppSettings {
   gitlabToken: string;
   gitlabUrl: string;
@@ -24,6 +35,7 @@ export interface AppSettings {
   aiReviewEnabled: boolean;
   aiReviewProvider: AiReviewProvider;
   reviewContexts: Record<string, ReviewContext>;
+  reviewCheckpoints: Record<string, ReviewCheckpoint>;
 }
 
 const CONTEXT_TTL_DAYS = 60;
@@ -39,6 +51,7 @@ const defaults: AppSettings = {
   aiReviewEnabled: true,
   aiReviewProvider: 'claude',
   reviewContexts: {},
+  reviewCheckpoints: {},
 };
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -55,6 +68,7 @@ export function getSettings(): AppSettings {
     aiReviewEnabled: store.get('aiReviewEnabled'),
     aiReviewProvider: store.get('aiReviewProvider'),
     reviewContexts: store.get('reviewContexts'),
+    reviewCheckpoints: store.get('reviewCheckpoints'),
   };
 }
 
@@ -100,6 +114,18 @@ export function updateReviewNotes(mrId: number, entryId: string, notes: string):
     entry.notes = notes;
     store.set('reviewHistory', history);
   }
+}
+
+export function getReviewCheckpoint(mrId: number): ReviewCheckpoint | null {
+  const checkpoints = store.get('reviewCheckpoints') ?? {};
+  return checkpoints[String(mrId)] ?? null;
+}
+
+export function saveReviewCheckpoint(checkpoint: ReviewCheckpoint): ReviewCheckpoint {
+  const checkpoints = store.get('reviewCheckpoints') ?? {};
+  checkpoints[String(checkpoint.mrId)] = checkpoint;
+  store.set('reviewCheckpoints', checkpoints);
+  return checkpoint;
 }
 
 export function pruneOldReviewHistory(): void {

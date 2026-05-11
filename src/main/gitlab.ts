@@ -69,6 +69,10 @@ export interface MrChanges {
   }[];
 }
 
+interface GitLabCompare {
+  diffs: MrChanges['changes'];
+}
+
 export class GitLabService {
   private baseUrl: string;
   private token: string;
@@ -219,6 +223,15 @@ export class GitLabService {
 
   getMrChanges(projectId: number, mrIid: number): Promise<MrChanges> {
     return this.get(`/projects/${projectId}/merge_requests/${mrIid}/changes`);
+  }
+
+  async getCompareChanges(projectId: number, fromSha: string, toSha: string): Promise<MrChanges> {
+    const compare = await this.get<GitLabCompare>(`/projects/${projectId}/repository/compare`, {
+      from: fromSha,
+      to: toSha,
+      straight: 'true',
+    });
+    return { changes: compare.diffs ?? [] };
   }
 
   async approveMr(projectId: number, mrIid: number): Promise<void> {
