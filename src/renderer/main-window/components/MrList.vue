@@ -144,6 +144,7 @@ async function onApprove(mr: MR) {
   try {
     await window.api.approveMr(mr.project_id, mr.iid);
     mrs.markApproved(mr.id);
+    await mrs.markCurrentHeadReviewed(mr, 'approve');
   } catch {
     // toast handled by parent
   }

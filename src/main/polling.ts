@@ -26,6 +26,19 @@ function notify(title: string, body: string): void {
   new Notification({ title, body }).show();
 }
 
+function truncateNotificationText(text: string, maxLength = 80): string {
+  const trimmed = text.trim();
+  return trimmed.length > maxLength ? `${trimmed.slice(0, maxLength - 1)}…` : trimmed;
+}
+
+function notifyMrChange(kind: 'New MR' | 'MR Updated', label: string, mr: MergeRequest): void {
+  const mrTitle = truncateNotificationText(mr.title);
+  const reference = mr.references?.full ?? `!${mr.iid}`;
+  const author = mr.author?.name ? ` by ${mr.author.name}` : '';
+
+  notify(`${kind}: ${mrTitle}`, `${label} - ${reference}${author}`);
+}
+
 function reviewActivityKey(mr: MergeRequest): string {
   return mr.review_activity_key ?? (mr.sha ? `commit:${mr.sha}` : `created:${mr.id}:${mr.created_at}`);
 }
@@ -39,9 +52,9 @@ function detectChanges(
     const prevActivity = prev.get(mr.id);
     const nextActivity = reviewActivityKey(mr);
     if (!prevActivity) {
-      notify(`New MR — ${label}`, `${mr.references?.full ?? mr.title}\n${mr.title}`);
+      notifyMrChange('New MR', label, mr);
     } else if (prevActivity !== nextActivity) {
-      notify(`MR Updated — ${label}`, `${mr.references?.full ?? mr.title}\n${mr.title}`);
+      notifyMrChange('MR Updated', label, mr);
     }
   }
 }

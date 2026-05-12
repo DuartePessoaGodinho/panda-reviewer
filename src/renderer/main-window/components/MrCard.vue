@@ -41,6 +41,7 @@
               </svg>
               Pinned
             </span>
+            <span v-if="hasNewChanges" class="badge updated" title="New commits since your last review">↑ New</span>
             <span v-if="mr.user_notes_count > 0" class="badge comments" :title="`${mr.user_notes_count} comment${mr.user_notes_count !== 1 ? 's' : ''}`">
               <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
                 <path d="M2 3.5A2.5 2.5 0 0 1 4.5 1h7A2.5 2.5 0 0 1 14 3.5v4A2.5 2.5 0 0 1 11.5 10H7.9l-3.2 2.4A.45.45 0 0 1 4 12.04V10A2 2 0 0 1 2 8V3.5Z"/>
@@ -113,8 +114,9 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, onMounted } from 'vue';
 import type { MR } from '../../types';
+import { useMrsStore } from '../stores/mrs';
 import { isDraft, displayTitle, projectName, timeAgo } from '../utils';
 
 const props = defineProps<{
@@ -137,6 +139,25 @@ defineEmits<{
 }>();
 
 const avatarFallback = 'data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 26 26%22><rect width=%2226%22 height=%2226%22 fill=%22%23232320%22/></svg>';
+
+const mrs = useMrsStore();
+const checkpoint = computed(() => mrs.reviewCheckpoints[props.mr.id] ?? null);
+
+onMounted(async () => {
+  try {
+    await mrs.loadReviewCheckpoint(props.mr.id);
+  } catch { /* silent */ }
+});
+
+const hasNewChanges = computed(() => {
+  const cp = checkpoint.value;
+  if (!cp) return false;
+  if (props.mr.sha && cp.sourceSha && props.mr.sha !== cp.sourceSha) return true;
+  if (props.mr.review_activity_at && props.mr.review_activity_kind === 'commit') {
+    return new Date(props.mr.review_activity_at) > new Date(cp.reviewedAt);
+  }
+  return false;
+});
 
 const draft          = computed(() => isDraft(props.mr));
 const title          = computed(() => displayTitle(props.mr));
@@ -197,21 +218,20 @@ const aiDisabledTitle = computed(() => {
 
 /* State: active selection */
 .mr-card.active {
-  background: var(--surface2);
-  border-color: var(--border2);
-  border-left-color: var(--accent);
-  box-shadow: var(--shadow-md);
+  background: var(--surface3);
+  border-color: var(--accent-border);
+  border-left: 3px solid var(--accent);
+  box-shadow: var(--shadow-md), 0 0 0 1px var(--accent-border);
 }
 .mr-card.active::before {
-  background: linear-gradient(180deg, rgba(30,214,154,0.04) 0%, transparent 50%);
+  background: linear-gradient(180deg, rgba(30,214,154,0.07) 0%, transparent 55%);
 }
 
-/* State: pipeline */
-.mr-card.card-pipeline-fail { border-left-color: var(--red); }
-.mr-card.card-pipeline-run  { border-left-color: var(--yellow); }
-
-/* State: approved */
-.mr-card.card-approved { border-left-color: var(--accent); }
+/* Pipeline status takes priority over active on left border */
+.mr-card.card-pipeline-fail,
+.mr-card.active.card-pipeline-fail { border-left-color: var(--red); }
+.mr-card.card-pipeline-run,
+.mr-card.active.card-pipeline-run  { border-left-color: var(--yellow); }
 
 /* Top section */
 .mr-card-top {

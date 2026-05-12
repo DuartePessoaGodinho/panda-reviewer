@@ -95,6 +95,7 @@
 import { ref, computed, onMounted } from 'vue';
 import type { MR } from '../types';
 import { useMrsStore } from './stores/mrs';
+import { useCommentsStore } from './stores/comments';
 import { useAiStore } from './stores/ai';
 import { projectUrl } from './utils';
 import MrList from './components/MrList.vue';
@@ -102,8 +103,9 @@ import DiffPanel from './components/DiffPanel.vue';
 import SettingsView from './components/SettingsView.vue';
 import './style.css';
 
-const mrs     = useMrsStore();
-const ai      = useAiStore();
+const mrs      = useMrsStore();
+const comments = useCommentsStore();
+const ai       = useAiStore();
 
 const mrListRef       = ref<InstanceType<typeof MrList> | null>(null);
 const aiEnabled       = ref(true);
@@ -119,6 +121,7 @@ const cloneCopied     = ref(false);
 interface Toast { id: number; msg: string; type: 'ok' | 'err' | 'info'; out: boolean }
 const toasts = ref<Toast[]>([]);
 let toastSeq = 0;
+let mrOpenSeq = 0;
 
 const providerLabel = computed(() => {
   if (aiProvider.value === 'copilot') return 'Copilot';
@@ -149,10 +152,23 @@ async function onRefresh() {
   setTimeout(() => { refreshing.value = false; }, 2000);
 }
 
-function onMrOpen(mr: MR) {
+async function onMrOpen(mr: MR) {
+  const seq = ++mrOpenSeq;
+  const isRunningReview = ai.running && ai.reviewingMr?.id === mr.id;
+
   mrs.setActiveMr(mr);
-  mrs.setActivePanelTab('diff');
-  mrs.setAiDrawerOpen(ai.running && ai.reviewingMr?.id === mr.id);
+  mrs.setActivePanelTab(isRunningReview ? 'ai' : 'diff');
+  mrs.setAiDrawerOpen(isRunningReview);
+
+  if (isRunningReview) return;
+
+  const history = await window.api.getReviewHistory(mr.id);
+  if (seq !== mrOpenSeq || mrs.activeMr?.id !== mr.id) return;
+
+  if (history.length > 0) {
+    mrs.setActivePanelTab('ai');
+    mrs.setAiDrawerOpen(true);
+  }
 }
 
 function onAiReview(mr: MR) {
@@ -192,6 +208,7 @@ onMounted(async () => {
   setPollStatus('ok', total > 0 ? `${total} MR${total !== 1 ? 's' : ''} open` : 'All clear');
 
   window.api.onMrsUpdated(async (data: any) => {
+    if (mrs.activeMr) void comments.refresh(mrs.activeMr);
     mrs.update(data);
     await prefetchRepoPaths([...data.toReview, ...data.myMrs]);
     const total = data.toReview.length + data.myMrs.length;

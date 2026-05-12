@@ -169,7 +169,10 @@ export class GitLabService {
       method: 'DELETE',
       headers: { 'PRIVATE-TOKEN': this.token },
     });
-    if (!res.ok) throw new Error(`GitLab API ${res.status}: ${path}`);
+    if (!res.ok) {
+      const text = await res.text().catch(() => '');
+      throw new Error(`GitLab API ${res.status}: ${path}${text ? ` - ${text}` : ''}`);
+    }
   }
 
   getCurrentUser(): Promise<GitLabUser> {
@@ -315,6 +318,10 @@ export class GitLabService {
     });
   }
 
+  getMrDiscussion(projectId: number, mrIid: number, discussionId: string): Promise<GitLabDiscussion> {
+    return this.get(`/projects/${projectId}/merge_requests/${mrIid}/discussions/${encodeURIComponent(discussionId)}`);
+  }
+
   createMrComment(projectId: number, mrIid: number, body: string): Promise<GitLabDiscussion> {
     return this.send('POST', `/projects/${projectId}/merge_requests/${mrIid}/discussions`, { body });
   }
@@ -364,15 +371,68 @@ export class GitLabService {
     noteId: number,
     body: string
   ): Promise<GitLabDiscussionNote> {
+    return this.updateMergeRequestComment(projectId, mrIid, discussionId, noteId, body);
+  }
+
+  private updateDiscussionNoteById(
+    projectId: number,
+    mrIid: number,
+    discussionId: string,
+    noteId: number,
+    body: string
+  ): Promise<GitLabDiscussionNote> {
     return this.send(
       'PUT',
-      `/projects/${projectId}/merge_requests/${mrIid}/discussions/${discussionId}/notes/${noteId}`,
+      `/projects/${projectId}/merge_requests/${mrIid}/discussions/${encodeURIComponent(discussionId)}/notes/${noteId}`,
       { body }
     );
   }
 
+  private updateMergeRequestNote(projectId: number, mrIid: number, noteId: number, body: string): Promise<GitLabDiscussionNote> {
+    return this.send('PUT', `/projects/${projectId}/merge_requests/${mrIid}/notes/${noteId}`, { body });
+  }
+
+  private async updateMergeRequestComment(
+    projectId: number,
+    mrIid: number,
+    discussionId: string,
+    noteId: number,
+    body: string
+  ): Promise<GitLabDiscussionNote> {
+    const discussion = await this.getMrDiscussion(projectId, mrIid, discussionId);
+    const note = discussion.notes.find(item => item.id === noteId);
+    if (!note) throw new Error(`GitLab discussion ${discussionId} does not contain note ${noteId}`);
+
+    if (note.type === null) {
+      return this.updateMergeRequestNote(projectId, mrIid, noteId, body);
+    }
+
+    return this.updateDiscussionNoteById(projectId, mrIid, discussionId, noteId, body);
+  }
+
   deleteDiscussionNote(projectId: number, mrIid: number, discussionId: string, noteId: number): Promise<void> {
-    return this.delete(`/projects/${projectId}/merge_requests/${mrIid}/discussions/${discussionId}/notes/${noteId}`);
+    return this.deleteMergeRequestComment(projectId, mrIid, discussionId, noteId);
+  }
+
+  private deleteDiscussionNoteById(projectId: number, mrIid: number, discussionId: string, noteId: number): Promise<void> {
+    return this.delete(`/projects/${projectId}/merge_requests/${mrIid}/discussions/${encodeURIComponent(discussionId)}/notes/${noteId}`);
+  }
+
+  private deleteMergeRequestNote(projectId: number, mrIid: number, noteId: number): Promise<void> {
+    return this.delete(`/projects/${projectId}/merge_requests/${mrIid}/notes/${noteId}`);
+  }
+
+  private async deleteMergeRequestComment(projectId: number, mrIid: number, discussionId: string, noteId: number): Promise<void> {
+    const discussion = await this.getMrDiscussion(projectId, mrIid, discussionId);
+    const note = discussion.notes.find(item => item.id === noteId);
+    if (!note) throw new Error(`GitLab discussion ${discussionId} does not contain note ${noteId}`);
+
+    if (note.type === null) {
+      await this.deleteMergeRequestNote(projectId, mrIid, noteId);
+      return;
+    }
+
+    await this.deleteDiscussionNoteById(projectId, mrIid, discussionId, noteId);
   }
 
   async getLatestMrVersion(projectId: number, mrIid: number): Promise<MergeRequestVersion | null> {

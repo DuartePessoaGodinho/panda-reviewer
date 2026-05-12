@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
-import type { MR } from '../../types';
+import type { MR, ReviewCheckpoint } from '../../types';
 
 const PINNED_MRS_STORAGE_KEY = 'pinnedMrIds';
 
@@ -30,6 +30,7 @@ export const useMrsStore = defineStore('mrs', () => {
   const locallyApproved = ref(new Set<number>());
   const repoCache = ref<Record<number, string | null>>({});
   const pinnedMrIds = ref(loadPinnedIds());
+  const reviewCheckpoints = ref<Record<number, ReviewCheckpoint>>({});
 
   const allMrs = computed(() => [...toReviewMrs.value, ...myMrs.value]);
   const uniqueOpenMrs = computed(() => [...new Map(allMrs.value.map(mr => [mr.id, mr])).values()]);
@@ -47,6 +48,31 @@ export const useMrsStore = defineStore('mrs', () => {
 
   function markApproved(mrId: number) {
     locallyApproved.value.add(mrId);
+  }
+
+  async function loadReviewCheckpoint(mrId: number): Promise<ReviewCheckpoint | null> {
+    const checkpoint = await window.api.getReviewCheckpoint(mrId);
+    if (checkpoint) reviewCheckpoints.value[mrId] = checkpoint;
+    else delete reviewCheckpoints.value[mrId];
+    return checkpoint;
+  }
+
+  async function markCurrentHeadReviewed(mr: MR, kind: ReviewCheckpoint['kind'] = 'manual'): Promise<ReviewCheckpoint | null> {
+    const sourceSha = mr.sha ?? reviewCheckpoints.value[mr.id]?.sourceSha;
+    if (!sourceSha) return null;
+
+    const checkpoint = await window.api.saveReviewCheckpoint({
+      mrId: mr.id,
+      projectId: mr.project_id,
+      mrIid: mr.iid,
+      sourceBranch: mr.source_branch,
+      targetBranch: mr.target_branch,
+      sourceSha,
+      reviewedAt: new Date().toISOString(),
+      kind,
+    });
+    reviewCheckpoints.value[mr.id] = checkpoint;
+    return checkpoint;
   }
 
   function isPinned(mr: MR): boolean {
@@ -98,12 +124,15 @@ export const useMrsStore = defineStore('mrs', () => {
     locallyApproved,
     repoCache,
     pinnedMrIds,
+    reviewCheckpoints,
     allMrs,
     uniqueOpenMrs,
     pinnedMrs,
     approvedByMe,
     findById,
     markApproved,
+    loadReviewCheckpoint,
+    markCurrentHeadReviewed,
     isPinned,
     togglePinned,
     setActiveMr,

@@ -80,19 +80,6 @@
           <template v-else>
             <div class="diff-summary">
               <div class="diff-title" :title="mrs.activeMr?.title">{{ mrs.activeMr?.title }}</div>
-              <button
-                v-if="!isCompact"
-                class="ai-review-toggle"
-                :class="{ active: mrs.aiDrawerOpen }"
-                :title="mrs.aiDrawerOpen ? 'Collapse AI Review' : 'Open AI Review beside the diff'"
-                :aria-expanded="mrs.aiDrawerOpen"
-                @click="toggleAiReview"
-              >
-                <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
-                  <path d="M8 0l1.5 5H16l-4.5 3.5L13 14 8 10l-5 4 1.5-5.5L0 5h6.5L8 0z"/>
-                </svg>
-                AI Review
-              </button>
               <div class="diff-meta">
                 <span class="diff-stat files">
                   <span class="diff-stat-value">{{ diffStats.files }}</span>
@@ -196,25 +183,54 @@
         </div>
 
         <aside
-          v-if="!isCompact"
+          v-if="!isCompact && (mrs.aiDrawerOpen || aiDrawerFullscreen)"
           class="ai-drawer"
-          :class="{ collapsed: !mrs.aiDrawerOpen }"
-          :aria-hidden="!mrs.aiDrawerOpen"
+          :class="{
+            fullscreen: aiDrawerFullscreen,
+            resizing: isResizingAiDrawer,
+          }"
+          :style="aiDrawerStyle"
+          :aria-hidden="!mrs.aiDrawerOpen && !aiDrawerFullscreen"
         >
+          <div
+            v-if="mrs.aiDrawerOpen && !aiDrawerFullscreen"
+            class="ai-drawer-resize-handle"
+            title="Resize AI Review"
+            role="separator"
+            aria-orientation="vertical"
+            @pointerdown="startAiDrawerResize"
+          ></div>
           <div class="ai-drawer-rail">
             <button
-              class="ai-drawer-toggle"
-              :title="mrs.aiDrawerOpen ? 'Collapse AI Review' : 'Expand AI Review'"
-              :aria-label="mrs.aiDrawerOpen ? 'Collapse AI Review' : 'Expand AI Review'"
-              :aria-expanded="mrs.aiDrawerOpen"
-              @click="mrs.setAiDrawerOpen(!mrs.aiDrawerOpen)"
+              class="ai-drawer-toggle close"
+              title="Close AI Review"
+              aria-label="Close AI Review"
+              @click="closeAiDrawer"
             >
-              <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
-                <path d="M8 0l1.5 5H16l-4.5 3.5L13 14 8 10l-5 4 1.5-5.5L0 5h6.5L8 0z"/>
+              <svg viewBox="0 0 16 16" aria-hidden="true">
+                <path d="M4 4l8 8M12 4l-8 8" />
+              </svg>
+            </button>
+            <button
+              class="ai-drawer-toggle secondary"
+              :title="aiDrawerFullscreen ? 'Restore side panel' : 'Fullscreen AI Review'"
+              :aria-label="aiDrawerFullscreen ? 'Restore side panel' : 'Fullscreen AI Review'"
+              :aria-pressed="aiDrawerFullscreen"
+              @click="toggleAiDrawerFullscreen"
+            >
+              <svg v-if="!aiDrawerFullscreen" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+                <path d="M2 2h5v1.4H4.4V6H3V3H2V2zm7 0h5v4h-1.4V3.4H10V2zM3 10h1.4v2.6H7V14H2v-4h1zm9.6 0H14v4H9v-1.4h3.6V10z"/>
+              </svg>
+              <svg v-else viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+                <path d="M6 2v5H1V5.6h2.6V3H6zm4 0h3v3.6H15V7h-5V2zM1 9h5v5H3v-2.6H1V9zm9 0h5v2.4h-2V14h-3V9z"/>
               </svg>
             </button>
           </div>
-          <div class="ai-drawer-body" :inert="!mrs.aiDrawerOpen">
+          <div
+            class="ai-drawer-body"
+            :style="aiDrawerBodyStyle"
+            :inert="!mrs.aiDrawerOpen && !aiDrawerFullscreen"
+          >
             <AiPanel
               :mr="mrs.activeMr!"
               :ai-enabled="props.aiEnabled"
@@ -229,9 +245,10 @@
 
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import type { CSSProperties } from 'vue';
 import { useMrsStore } from '../stores/mrs';
 import { useCommentsStore } from '../stores/comments';
-import type { DiffPosition, GitLabDiscussion, GitLabDiscussionNote, ReviewCheckpoint } from '../../types';
+import type { DiffPosition, GitLabDiscussion, GitLabDiscussionNote } from '../../types';
 import * as Diff2Html from 'diff2html';
 import AiPanel from './AiPanel/index.vue';
 import CommentsPanel from './CommentsPanel.vue';
@@ -240,6 +257,10 @@ import { renderMarkdown } from '../utils';
 const props = defineProps<{ aiEnabled: boolean; providerLabel: string }>();
 
 type DiffMode = 'full' | 'new';
+const AI_DRAWER_WIDTH_STORAGE_KEY = 'aiDrawerWidth';
+const AI_DRAWER_RAIL_WIDTH = 42;
+const AI_DRAWER_MIN_WIDTH = 380;
+const AI_DRAWER_DEFAULT_WIDTH = 440;
 
 const mrs = useMrsStore();
 const loadingDiff = ref(false);
@@ -247,9 +268,12 @@ const diffError   = ref(false);
 const diffHtml    = ref('');
 const diffStats   = ref({ files: 0, added: 0, deleted: 0 });
 const diffMode    = ref<DiffMode>('full');
-const checkpoint  = ref<ReviewCheckpoint | null>(null);
+const checkpoint = computed(() => mrs.activeMr ? mrs.reviewCheckpoints[mrs.activeMr.id] ?? null : null);
 const markingReviewed = ref(false);
 const isCompact = ref(false);
+const aiDrawerWidth = ref(loadAiDrawerWidth());
+const aiDrawerFullscreen = ref(false);
+const isResizingAiDrawer = ref(false);
 const comments = useCommentsStore();
 const currentChanges = ref<any[]>([]);
 const currentCombinedDiff = ref('');
@@ -311,6 +335,31 @@ const newChangesTitle = computed(() => {
   if (!hasNewChanges.value) return 'No new commits since your last Panda review';
   return `Show changes from ${shortSha(checkpoint.value.sourceSha)} to ${shortSha(currentSha.value)}`;
 });
+const aiDrawerStyle = computed<CSSProperties>(() => {
+  if (aiDrawerFullscreen.value) return {};
+  return { flexBasis: `${aiDrawerWidth.value}px` };
+});
+const aiDrawerBodyStyle = computed<CSSProperties>(() => {
+  if (aiDrawerFullscreen.value) return {};
+  return { width: `${Math.max(0, aiDrawerWidth.value - AI_DRAWER_RAIL_WIDTH)}px` };
+});
+
+function loadAiDrawerWidth() {
+  const saved = Number(localStorage.getItem(AI_DRAWER_WIDTH_STORAGE_KEY));
+  return Number.isFinite(saved) ? saved : AI_DRAWER_DEFAULT_WIDTH;
+}
+
+function maxAiDrawerWidth() {
+  return Math.max(AI_DRAWER_MIN_WIDTH, Math.floor(window.innerWidth * 0.82));
+}
+
+function clampAiDrawerWidth(width: number) {
+  return Math.min(maxAiDrawerWidth(), Math.max(AI_DRAWER_MIN_WIDTH, Math.round(width)));
+}
+
+function saveAiDrawerWidth(width: number) {
+  localStorage.setItem(AI_DRAWER_WIDTH_STORAGE_KEY, String(width));
+}
 
 function shortSha(sha: string) {
   return sha ? sha.slice(0, 8) : '';
@@ -330,6 +379,7 @@ function showComments() {
 function toggleAiReview() {
   if (!isCompact.value) {
     const nextOpen = !mrs.aiDrawerOpen;
+    if (!nextOpen) aiDrawerFullscreen.value = false;
     mrs.setAiDrawerOpen(nextOpen);
     mrs.setActivePanelTab(nextOpen ? 'ai' : 'diff');
     return;
@@ -339,6 +389,107 @@ function toggleAiReview() {
 
 function updateCompactState(event: MediaQueryListEvent | MediaQueryList) {
   isCompact.value = event.matches;
+  if (event.matches) aiDrawerFullscreen.value = false;
+}
+
+function closeAiDrawer() {
+  aiDrawerFullscreen.value = false;
+  mrs.setAiDrawerOpen(false);
+  mrs.setActivePanelTab('diff');
+}
+
+function toggleAiDrawerFullscreen() {
+  const nextFullscreen = !aiDrawerFullscreen.value;
+  aiDrawerFullscreen.value = nextFullscreen;
+  if (nextFullscreen) {
+    mrs.setAiDrawerOpen(true);
+    mrs.setActivePanelTab('ai');
+  }
+}
+
+function startAiDrawerResize(event: PointerEvent) {
+  if (!mrs.aiDrawerOpen) return;
+
+  event.preventDefault();
+  const startX = event.clientX;
+  const startWidth = aiDrawerWidth.value;
+  isResizingAiDrawer.value = true;
+  document.body.classList.add('ai-drawer-resizing');
+
+  const onPointerMove = (moveEvent: PointerEvent) => {
+    aiDrawerWidth.value = clampAiDrawerWidth(startWidth + startX - moveEvent.clientX);
+  };
+
+  const onPointerUp = () => {
+    isResizingAiDrawer.value = false;
+    document.body.classList.remove('ai-drawer-resizing');
+    aiDrawerWidth.value = clampAiDrawerWidth(aiDrawerWidth.value);
+    saveAiDrawerWidth(aiDrawerWidth.value);
+    window.removeEventListener('pointermove', onPointerMove);
+    window.removeEventListener('pointerup', onPointerUp);
+    window.removeEventListener('pointercancel', onPointerUp);
+  };
+
+  window.addEventListener('pointermove', onPointerMove);
+  window.addEventListener('pointerup', onPointerUp);
+  window.addEventListener('pointercancel', onPointerUp);
+}
+
+function handleGlobalKeydown(event: KeyboardEvent) {
+  if (event.key === 'Escape' && aiDrawerFullscreen.value) {
+    aiDrawerFullscreen.value = false;
+  }
+}
+
+type LanguageTheme = {
+  className: string;
+  label: string;
+};
+
+const languageThemesByExtension: Record<string, LanguageTheme> = {
+  ts: { className: 'lang-ts', label: 'TS' },
+  tsx: { className: 'lang-ts', label: 'TSX' },
+  js: { className: 'lang-js', label: 'JS' },
+  jsx: { className: 'lang-js', label: 'JSX' },
+  mjs: { className: 'lang-js', label: 'JS' },
+  cjs: { className: 'lang-js', label: 'JS' },
+  vue: { className: 'lang-vue', label: 'Vue' },
+  css: { className: 'lang-css', label: 'CSS' },
+  scss: { className: 'lang-css', label: 'SCSS' },
+  sass: { className: 'lang-css', label: 'Sass' },
+  less: { className: 'lang-css', label: 'Less' },
+  html: { className: 'lang-html', label: 'HTML' },
+  htm: { className: 'lang-html', label: 'HTML' },
+  json: { className: 'lang-json', label: 'JSON' },
+  jsonc: { className: 'lang-json', label: 'JSONC' },
+  yaml: { className: 'lang-yaml', label: 'YAML' },
+  yml: { className: 'lang-yaml', label: 'YAML' },
+  toml: { className: 'lang-config', label: 'TOML' },
+  env: { className: 'lang-config', label: 'ENV' },
+  md: { className: 'lang-md', label: 'MD' },
+  mdx: { className: 'lang-md', label: 'MDX' },
+  py: { className: 'lang-py', label: 'Python' },
+  java: { className: 'lang-java', label: 'Java' },
+  kt: { className: 'lang-java', label: 'Kotlin' },
+  kts: { className: 'lang-java', label: 'Kotlin' },
+  go: { className: 'lang-go', label: 'Go' },
+  rs: { className: 'lang-rs', label: 'Rust' },
+  sh: { className: 'lang-shell', label: 'Shell' },
+  bash: { className: 'lang-shell', label: 'Bash' },
+  zsh: { className: 'lang-shell', label: 'Zsh' },
+  xml: { className: 'lang-xml', label: 'XML' },
+  svg: { className: 'lang-xml', label: 'SVG' },
+  sql: { className: 'lang-sql', label: 'SQL' },
+};
+
+function getLanguageTheme(fileName: string): LanguageTheme | null {
+  const ext = fileName.split('.').pop()?.toLowerCase() ?? '';
+  return languageThemesByExtension[ext] ?? null;
+}
+
+function applyLanguageTheme(element: Element, theme: LanguageTheme | null) {
+  if (!theme) return;
+  element.classList.add(theme.className, 'has-language-theme');
 }
 
 function makeDiffFilesCollapsible(html: string) {
@@ -347,6 +498,10 @@ function makeDiffFilesCollapsible(html: string) {
   doc.querySelectorAll('.d2h-file-wrapper').forEach((file) => {
     const header = file.querySelector('.d2h-file-header');
     if (!header) return;
+
+    const fileName = header.querySelector('.d2h-file-name')?.textContent?.trim() ?? '';
+    const theme = getLanguageTheme(fileName);
+    applyLanguageTheme(file, theme);
 
     header.querySelector('.d2h-file-collapse')?.remove();
 
@@ -364,6 +519,11 @@ function makeDiffFilesCollapsible(html: string) {
     toggle.setAttribute('title', 'Collapse file diff');
 
     header.appendChild(toggle);
+  });
+
+  doc.querySelectorAll('.d2h-file-list > li').forEach((li) => {
+    const fileName = li.querySelector('.d2h-file-name')?.textContent?.trim() ?? '';
+    applyLanguageTheme(li, getLanguageTheme(fileName));
   });
 
   return doc.body.firstElementChild?.innerHTML ?? html;
@@ -387,9 +547,15 @@ function isCurrentDiscussionPosition(position: DiffPosition | null): boolean {
   return !currentSha.value || position.head_sha === currentSha.value;
 }
 
+function isDiscussionResolved(discussion: GitLabDiscussion): boolean {
+  const resolvable = discussion.notes.filter(n => n.resolvable);
+  return resolvable.length > 0 && resolvable.every(n => n.resolved);
+}
+
 function discussionsByPosition(discussions: GitLabDiscussion[]) {
   const map = new Map<string, GitLabDiscussion[]>();
   for (const discussion of discussions) {
+    if (isDiscussionResolved(discussion)) continue;
     const position = discussionPosition(discussion);
     if (!isCurrentDiscussionPosition(position)) continue;
     if (!position) continue;
@@ -467,6 +633,203 @@ function extractDiffLinePositions(html: string, changes: any[]) {
   return map;
 }
 
+function leadingIndentLength(value: string) {
+  const match = value.match(/^[\t \u00a0]+/);
+  return match?.[0].length ?? 0;
+}
+
+function removeLeadingIndent(node: Node, amount: number) {
+  let remaining = amount;
+
+  function visit(current: Node): boolean {
+    if (remaining <= 0) return true;
+
+    if (current.nodeType === Node.TEXT_NODE) {
+      const text = current.textContent ?? '';
+      const indent = text.match(/^[\t \u00a0]+/)?.[0] ?? '';
+      const removeCount = Math.min(remaining, indent.length);
+      if (removeCount > 0) {
+        current.textContent = text.slice(removeCount);
+        remaining -= removeCount;
+      }
+      return remaining <= 0 || removeCount < text.length;
+    }
+
+    for (const child of Array.from(current.childNodes)) {
+      if (visit(child)) return true;
+    }
+
+    return false;
+  }
+
+  visit(node);
+}
+
+function normalizeVisibleIndentation(doc: Document) {
+  doc.querySelectorAll('.d2h-file-wrapper').forEach((file) => {
+    let currentGroup: Element[] = [];
+    const flushGroup = () => {
+      if (currentGroup.length === 0) return;
+
+      const codeContainers = currentGroup
+        .map(row => row.querySelector('.d2h-code-line-ctn'))
+        .filter((container): container is Element => Boolean(container));
+      const indents = codeContainers
+        .map(container => container.textContent ?? '')
+        .filter(text => text.trim().length > 0)
+        .map(leadingIndentLength);
+      const commonIndent = indents.length ? Math.min(...indents) : 0;
+
+      if (commonIndent > 0) {
+        codeContainers.forEach(container => removeLeadingIndent(container, commonIndent));
+      }
+
+      currentGroup = [];
+    };
+
+    file.querySelectorAll('tbody tr').forEach((row) => {
+      const codeCell = row.querySelector('td:nth-child(2)');
+      if (!codeCell || codeCell.classList.contains('d2h-info')) {
+        flushGroup();
+        return;
+      }
+      if (codeCell.querySelector('.d2h-code-line-ctn')) currentGroup.push(row);
+    });
+
+    flushGroup();
+  });
+}
+
+type SyntaxToken = {
+  text: string;
+  className?: string;
+};
+
+const javaKeywords = new Set([
+  'abstract', 'assert', 'boolean', 'break', 'byte', 'case', 'catch', 'char', 'class', 'const',
+  'continue', 'default', 'do', 'double', 'else', 'enum', 'extends', 'final', 'finally', 'float',
+  'for', 'if', 'implements', 'import', 'instanceof', 'int', 'interface', 'long', 'native', 'new',
+  'package', 'private', 'protected', 'public', 'return', 'short', 'static', 'strictfp', 'super',
+  'switch', 'synchronized', 'this', 'throw', 'throws', 'transient', 'try', 'void', 'volatile',
+  'while', 'var',
+]);
+
+const javaLiterals = new Set(['true', 'false', 'null']);
+
+function syntaxClassForWord(word: string, langClass: string): string | undefined {
+  if (langClass === 'lang-java') {
+    if (javaKeywords.has(word)) return 'syn-keyword';
+    if (javaLiterals.has(word)) return 'syn-literal';
+    if (/^[A-Z][A-Za-z0-9_]*$/.test(word)) return 'syn-type';
+  }
+  return undefined;
+}
+
+function tokenizeJava(text: string): SyntaxToken[] {
+  const tokens: SyntaxToken[] = [];
+  const pattern = /(@[A-Za-z_][\w.]*)|("(?:\\.|[^"\\])*")|('(?:\\.|[^'\\])*')|(\/\/.*$)|(\b\d+(?:\.\d+)?\b)|(\b[A-Za-z_]\w*\b)/g;
+  let lastIndex = 0;
+  let match: RegExpExecArray | null;
+
+  while ((match = pattern.exec(text))) {
+    if (match.index > lastIndex) tokens.push({ text: text.slice(lastIndex, match.index) });
+    const value = match[0];
+    const className = match[1]
+      ? 'syn-annotation'
+      : match[2] || match[3]
+        ? 'syn-string'
+        : match[4]
+          ? 'syn-comment'
+          : match[5]
+            ? 'syn-number'
+            : syntaxClassForWord(value, 'lang-java');
+    tokens.push({ text: value, className });
+    lastIndex = pattern.lastIndex;
+  }
+
+  if (lastIndex < text.length) tokens.push({ text: text.slice(lastIndex) });
+  return tokens;
+}
+
+function tokenizeYaml(text: string): SyntaxToken[] {
+  const commentIndex = text.indexOf('#');
+  const content = commentIndex >= 0 ? text.slice(0, commentIndex) : text;
+  const comment = commentIndex >= 0 ? text.slice(commentIndex) : '';
+  const tokens: SyntaxToken[] = [];
+  const keyMatch = content.match(/^(\s*-?\s*)([A-Za-z0-9_.-]+)(\s*:)/);
+
+  if (keyMatch) {
+    tokens.push({ text: keyMatch[1] });
+    tokens.push({ text: keyMatch[2], className: 'syn-property' });
+    tokens.push({ text: keyMatch[3], className: 'syn-punctuation' });
+    tokenizeYamlScalars(content.slice(keyMatch[0].length), tokens);
+  } else {
+    tokenizeYamlScalars(content, tokens);
+  }
+
+  if (comment) tokens.push({ text: comment, className: 'syn-comment' });
+  return tokens;
+}
+
+function tokenizeYamlScalars(text: string, tokens: SyntaxToken[]) {
+  const pattern = /("(?:\\.|[^"\\])*")|('(?:\\.|[^'\\])*')|(\b(?:true|false|null|yes|no|on|off)\b)|(\b\d+(?:\.\d+)?\b)/gi;
+  let lastIndex = 0;
+  let match: RegExpExecArray | null;
+
+  while ((match = pattern.exec(text))) {
+    if (match.index > lastIndex) tokens.push({ text: text.slice(lastIndex, match.index) });
+    tokens.push({
+      text: match[0],
+      className: match[1] || match[2] ? 'syn-string' : match[3] ? 'syn-literal' : 'syn-number',
+    });
+    lastIndex = pattern.lastIndex;
+  }
+
+  if (lastIndex < text.length) tokens.push({ text: text.slice(lastIndex) });
+}
+
+function tokenizeSyntax(text: string, langClass: string): SyntaxToken[] {
+  if (langClass === 'lang-java') return tokenizeJava(text);
+  if (langClass === 'lang-yaml') return tokenizeYaml(text);
+  return [{ text }];
+}
+
+function highlightTextNode(doc: Document, textNode: Text, langClass: string) {
+  const tokens = tokenizeSyntax(textNode.textContent ?? '', langClass);
+  if (!tokens.some(token => token.className)) return;
+
+  const fragment = doc.createDocumentFragment();
+  tokens.forEach((token) => {
+    if (!token.className) {
+      fragment.appendChild(doc.createTextNode(token.text));
+      return;
+    }
+    const span = doc.createElement('span');
+    span.className = token.className;
+    span.textContent = token.text;
+    fragment.appendChild(span);
+  });
+  textNode.replaceWith(fragment);
+}
+
+function highlightSyntax(doc: Document) {
+  doc.querySelectorAll('.d2h-file-wrapper').forEach((file) => {
+    const langClass = Array.from(file.classList).find(className => className.startsWith('lang-'));
+    if (!langClass) return;
+
+    file.querySelectorAll('.d2h-code-line-ctn').forEach((container) => {
+      const walker = doc.createTreeWalker(container, NodeFilter.SHOW_TEXT);
+      const textNodes: Text[] = [];
+      let node = walker.nextNode();
+      while (node) {
+        textNodes.push(node as Text);
+        node = walker.nextNode();
+      }
+      textNodes.forEach(textNode => highlightTextNode(doc, textNode, langClass));
+    });
+  });
+}
+
 function decorateDiffHtml(html: string, changes: any[], discussions: GitLabDiscussion[]) {
   const doc = new DOMParser().parseFromString(`<div>${html}</div>`, 'text/html');
   const byPosition = discussionsByPosition(discussions);
@@ -536,6 +899,9 @@ function decorateDiffHtml(html: string, changes: any[], discussions: GitLabDiscu
       row.after(discussionRow);
     });
   });
+
+  normalizeVisibleIndentation(doc);
+  highlightSyntax(doc);
 
   return doc.body.firstElementChild?.innerHTML ?? html;
 }
@@ -632,7 +998,7 @@ async function loadDiff() {
 }
 
 async function loadCheckpoint(mrId: number) {
-  checkpoint.value = await window.api.getReviewCheckpoint(mrId);
+  await mrs.loadReviewCheckpoint(mrId);
   if (!hasNewChanges.value) diffMode.value = 'full';
 }
 
@@ -642,16 +1008,7 @@ async function markReviewed() {
 
   markingReviewed.value = true;
   try {
-    checkpoint.value = await window.api.saveReviewCheckpoint({
-      mrId: mr.id,
-      projectId: mr.project_id,
-      mrIid: mr.iid,
-      sourceBranch: mr.source_branch,
-      targetBranch: mr.target_branch,
-      sourceSha: mr.sha,
-      reviewedAt: new Date().toISOString(),
-      kind: 'manual',
-    });
+    await mrs.markCurrentHeadReviewed(mr, 'manual');
     diffMode.value = 'full';
   } finally {
     markingReviewed.value = false;
@@ -768,13 +1125,17 @@ watch(
 );
 
 onMounted(() => {
+  aiDrawerWidth.value = clampAiDrawerWidth(aiDrawerWidth.value);
   compactQuery = window.matchMedia('(max-width: 1180px)');
   updateCompactState(compactQuery);
   compactQuery.addEventListener('change', updateCompactState);
+  window.addEventListener('keydown', handleGlobalKeydown);
 });
 
 onBeforeUnmount(() => {
   compactQuery?.removeEventListener('change', updateCompactState);
+  window.removeEventListener('keydown', handleGlobalKeydown);
+  document.body.classList.remove('ai-drawer-resizing');
 });
 </script>
 
@@ -960,6 +1321,7 @@ onBeforeUnmount(() => {
 
 /* Diff content area */
 .review-workspace {
+  position: relative;
   flex: 1;
   min-height: 0;
   overflow: hidden;
@@ -978,7 +1340,7 @@ onBeforeUnmount(() => {
 
 .ai-drawer {
   position: relative;
-  flex: 0 0 clamp(380px, 34vw, 460px);
+  flex: 0 0 440px;
   min-width: 0;
   display: flex;
   overflow: hidden;
@@ -987,8 +1349,44 @@ onBeforeUnmount(() => {
   transition: flex-basis 0.22s var(--ease-out);
 }
 
-.ai-drawer.collapsed {
-  flex-basis: 42px;
+.ai-drawer.resizing {
+  transition: none;
+}
+
+.ai-drawer.fullscreen {
+  position: absolute;
+  inset: 0;
+  z-index: 90;
+  flex-basis: auto;
+  border-left: 0;
+  box-shadow: var(--shadow-lg);
+}
+
+.ai-drawer-resize-handle {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: -4px;
+  z-index: 3;
+  width: 8px;
+  cursor: col-resize;
+}
+
+.ai-drawer-resize-handle::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 3px;
+  width: 2px;
+  background: transparent;
+  transition: background var(--dur-fast), box-shadow var(--dur-fast);
+}
+
+.ai-drawer-resize-handle:hover::after,
+.ai-drawer.resizing .ai-drawer-resize-handle::after {
+  background: var(--accent);
+  box-shadow: 0 0 12px var(--accent-glow);
 }
 
 .ai-drawer-rail {
@@ -997,7 +1395,10 @@ onBeforeUnmount(() => {
   border-right: 1px solid var(--border);
   background: linear-gradient(180deg, var(--surface2), var(--surface));
   display: flex;
-  justify-content: center;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 8px;
   padding-top: 10px;
 }
 
@@ -1025,6 +1426,43 @@ onBeforeUnmount(() => {
 }
 .ai-drawer-toggle:active { transform: scale(0.92); }
 
+.ai-drawer-toggle.secondary {
+  background: transparent;
+  border-color: var(--border);
+  color: var(--text3);
+  animation: none;
+}
+
+.ai-drawer-toggle.close {
+  background: transparent;
+  border-color: var(--border);
+  color: var(--text3);
+  animation: none;
+}
+
+.ai-drawer-toggle.close svg {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+}
+
+.ai-drawer-toggle.secondary:hover {
+  background: var(--surface3);
+  border-color: var(--border2);
+  color: var(--text2);
+  box-shadow: none;
+  animation: none;
+}
+
+.ai-drawer-toggle.close:hover {
+  background: rgba(229,83,75,0.12);
+  border-color: rgba(229,83,75,0.28);
+  color: var(--red);
+  box-shadow: none;
+  animation: none;
+}
+
 .ai-drawer-toggle:focus-visible {
   outline: none;
   box-shadow: 0 0 0 3px var(--accent-bg);
@@ -1036,25 +1474,23 @@ onBeforeUnmount(() => {
 }
 
 .ai-drawer-body {
-  width: calc(clamp(380px, 34vw, 460px) - 42px);
+  width: 398px;
   min-width: 0;
   display: flex;
   opacity: 1;
   transition: opacity var(--dur-base) var(--ease-out);
 }
 
-.ai-drawer.collapsed .ai-drawer-body {
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity var(--dur-fast) var(--ease-in);
+.ai-drawer.fullscreen .ai-drawer-body {
+  width: calc(100% - 42px);
 }
 
 .diff-summary {
   min-height: 44px;
   flex-shrink: 0;
-  padding: 10px 16px;
-  border-bottom: 1px solid var(--border);
-  background: linear-gradient(180deg, var(--surface2) 0%, var(--surface) 100%);
+  padding: 9px 14px;
+  border-bottom: 1px solid var(--diff-border);
+  background: linear-gradient(180deg, #191919 0%, #141414 100%);
   display: flex;
   align-items: center;
   gap: 14px;
@@ -1066,54 +1502,10 @@ onBeforeUnmount(() => {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  color: var(--text);
+  color: #F0F3F6;
   font-size: 14px;
   font-weight: 600;
   letter-spacing: -0.02em;
-}
-
-.ai-review-toggle,
-.comments-toggle {
-  height: 30px;
-  padding: 0 11px;
-  border: 1px solid var(--accent-border);
-  border-radius: var(--radius-sm);
-  background: var(--accent-dim);
-  color: var(--accent);
-  cursor: pointer;
-  font-family: var(--font-ui);
-  font-size: 12px;
-  font-weight: 700;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  flex-shrink: 0;
-  letter-spacing: 0;
-  transition: background var(--dur-fast), border-color var(--dur-fast), box-shadow var(--dur-fast), transform var(--dur-fast) var(--ease-spring);
-}
-
-.ai-review-toggle:hover,
-.ai-review-toggle.active,
-.comments-toggle:hover,
-.comments-toggle.active {
-  background: rgba(30,214,154,0.16);
-  border-color: var(--accent);
-  box-shadow: 0 0 16px var(--accent-glow);
-  transform: translateY(-1px);
-}
-.ai-review-toggle:active { transform: scale(0.97); }
-
-.ai-review-toggle:focus-visible,
-.comments-toggle:focus-visible {
-  outline: none;
-  box-shadow: 0 0 0 3px var(--accent-bg);
-}
-
-.ai-review-toggle svg,
-.comments-toggle svg {
-  width: 12px;
-  height: 12px;
-  flex-shrink: 0;
 }
 
 .diff-meta {
@@ -1122,17 +1514,17 @@ onBeforeUnmount(() => {
   gap: 1px;
   flex-shrink: 0;
   overflow: hidden;
-  border: 1px solid var(--border2);
+  border: 1px solid #303030;
   border-radius: 6px;
-  background: var(--border);
+  background: #303030;
 }
 
 .diff-stat {
   min-width: 66px;
   min-height: 30px;
   padding: 5px 8px 4px;
-  background: linear-gradient(180deg, var(--surface2), var(--surface));
-  color: var(--text2);
+  background: linear-gradient(180deg, #202020, #181818);
+  color: var(--diff-line-muted);
   display: flex;
   flex-direction: column;
   justify-content: center;
@@ -1144,7 +1536,7 @@ onBeforeUnmount(() => {
   font-size: 13px;
   line-height: 1;
   font-weight: 700;
-  color: var(--text);
+  color: #E8EDF2;
   letter-spacing: 0;
 }
 
@@ -1165,35 +1557,35 @@ onBeforeUnmount(() => {
   min-width: 74px;
   background:
     linear-gradient(180deg, rgba(255,255,255,0.025), transparent),
-    var(--surface2);
+    var(--diff-panel2);
 }
 
 .diff-stat.add {
   background:
-    linear-gradient(180deg, rgba(23,207,139,0.14), rgba(23,207,139,0.045)),
-    var(--surface);
+    linear-gradient(180deg, rgba(34,197,94,0.15), rgba(34,197,94,0.04)),
+    var(--diff-panel);
 }
 
 .diff-stat.add .diff-stat-value {
-  color: var(--green);
+  color: var(--diff-add);
 }
 
 .diff-stat.del {
   background:
-    linear-gradient(180deg, rgba(229,83,75,0.14), rgba(229,83,75,0.045)),
-    var(--surface);
+    linear-gradient(180deg, rgba(241,93,82,0.16), rgba(241,93,82,0.045)),
+    var(--diff-panel);
 }
 
 .diff-stat.del .diff-stat-value {
-  color: var(--red);
+  color: var(--diff-del);
 }
 
 .review-checkpoint-bar {
   min-height: 42px;
   flex-shrink: 0;
   padding: 7px 14px;
-  border-bottom: 1px solid var(--border);
-  background: var(--surface);
+  border-bottom: 1px solid var(--diff-border);
+  background: var(--diff-panel);
   display: flex;
   align-items: center;
   gap: 10px;
@@ -1201,23 +1593,23 @@ onBeforeUnmount(() => {
 
 .review-checkpoint-bar.reviewed {
   background:
-    linear-gradient(90deg, rgba(23,207,139,0.08), transparent 42%),
-    var(--surface);
+    linear-gradient(90deg, rgba(34,197,94,0.09), transparent 42%),
+    var(--diff-panel);
 }
 
 .review-checkpoint-bar.stale {
   background:
     linear-gradient(90deg, rgba(201,154,13,0.1), transparent 45%),
-    var(--surface);
+    var(--diff-panel);
 }
 
 .diff-mode-tabs {
   display: inline-flex;
   align-items: center;
   padding: 2px;
-  border: 1px solid var(--border);
+  border: 1px solid var(--diff-border);
   border-radius: 7px;
-  background: var(--bg);
+  background: #0F0F0F;
   flex-shrink: 0;
 }
 
@@ -1238,13 +1630,13 @@ onBeforeUnmount(() => {
 }
 
 .diff-mode-tab:hover:not(:disabled) {
-  color: var(--text2);
-  background: var(--surface2);
+  color: var(--diff-line);
+  background: #222222;
 }
 
 .diff-mode-tab.active {
-  color: var(--text);
-  background: var(--surface2);
+  color: #F0F3F6;
+  background: #2B2B2B;
 }
 
 .diff-mode-tab:disabled {
@@ -1375,8 +1767,8 @@ onBeforeUnmount(() => {
   flex: 1;
   min-height: 0;
   overflow: auto;
-  padding: 14px;
-  background: var(--bg);
+  padding: 12px;
+  background: var(--diff-bg);
   user-select: text;
 }
 
@@ -1495,30 +1887,33 @@ onBeforeUnmount(() => {
 /* ── diff2html theming ── */
 .diff-content :deep(.d2h-wrapper) {
   background: transparent !important;
-  color: var(--text2) !important;
+  color: var(--diff-line) !important;
 }
 .diff-content :deep(.d2h-file-list-wrapper) {
-  background: var(--surface) !important;
-  border: 1px solid var(--border) !important;
-  border-radius: 9px;
+  background: var(--diff-panel) !important;
+  border: 1px solid var(--diff-border) !important;
+  border-radius: 7px;
   margin: 0 0 12px !important;
   overflow: hidden;
 }
 .diff-content :deep(.d2h-file-list-header) {
-  background: var(--surface2) !important;
-  border-bottom: 1px solid var(--border) !important;
-  color: var(--text) !important;
+  background: var(--diff-panel2) !important;
+  border-bottom: 1px solid var(--diff-border) !important;
+  color: #E8EDF2 !important;
 }
 .diff-content :deep(.d2h-file-list-title),
 .diff-content :deep(.d2h-file-list-line) {
-  color: var(--text2) !important;
+  color: var(--diff-line-muted) !important;
 }
 .diff-content :deep(.d2h-file-list) {
-  background: var(--surface) !important;
+  background: var(--diff-panel) !important;
   margin: 0 !important;
 }
 .diff-content :deep(.d2h-file-list > li) {
-  border-color: var(--border) !important;
+  border-color: var(--diff-border) !important;
+}
+.diff-content :deep(.d2h-file-list > li:hover) {
+  background: #202020 !important;
 }
 .diff-content :deep(.d2h-file-list a) {
   color: var(--accent) !important;
@@ -1552,30 +1947,30 @@ onBeforeUnmount(() => {
   box-shadow: inset 0 1px 0 rgba(255,255,255,0.04);
 }
 .diff-content :deep(.d2h-file-list-line .d2h-lines-added) {
-  background: rgba(23,207,139,0.1);
-  border-color: rgba(23,207,139,0.3) !important;
-  color: var(--green) !important;
+  background: rgba(34,197,94,0.13);
+  border-color: rgba(34,197,94,0.32) !important;
+  color: #43E17C !important;
 }
 .diff-content :deep(.d2h-file-list-line .d2h-lines-deleted) {
-  background: rgba(229,83,75,0.1);
-  border-color: rgba(229,83,75,0.3) !important;
-  color: var(--red) !important;
+  background: rgba(241,93,82,0.12);
+  border-color: rgba(241,93,82,0.32) !important;
+  color: #FF746B !important;
   margin-left: 0 !important;
 }
 .diff-content :deep(.d2h-file-wrapper) {
-  background: var(--bg) !important;
-  border: 1px solid var(--border) !important;
-  border-radius: 9px;
+  background: var(--diff-bg) !important;
+  border: 1px solid var(--diff-border) !important;
+  border-radius: 7px;
   overflow: auto;
   margin: 0 0 12px !important;
   max-width: 100%;
 }
 .diff-content :deep(.d2h-file-header) {
-  height: 32px !important;
-  padding: 6px 12px !important;
-  background: var(--surface) !important;
-  border-color: var(--border) !important;
-  color: var(--text2) !important;
+  height: 34px !important;
+  padding: 6px 10px 6px 12px !important;
+  background: var(--diff-panel) !important;
+  border-color: var(--diff-border) !important;
+  color: var(--diff-line) !important;
   font-size: 12.5px !important;
   font-family: var(--font-mono) !important;
 }
@@ -1583,7 +1978,7 @@ onBeforeUnmount(() => {
 .diff-content :deep(.d2h-file-name-wrapper),
 .diff-content :deep(.d2h-file-collapse),
 .diff-content :deep(.d2h-file-stats) {
-  color: var(--text2) !important;
+  color: var(--diff-line) !important;
 }
 .diff-content :deep(.d2h-file-header .d2h-file-name-wrapper) {
   flex: 1;
@@ -1607,10 +2002,10 @@ onBeforeUnmount(() => {
   width: 24px;
   height: 24px;
   padding: 0;
-  border: 1px solid var(--border2);
+  border: 1px solid #343434;
   border-radius: 5px;
-  background: var(--surface2);
-  color: var(--text3);
+  background: #202020;
+  color: var(--diff-line-muted);
   cursor: pointer;
   flex-shrink: 0;
   display: inline-flex;
@@ -1629,9 +2024,9 @@ onBeforeUnmount(() => {
   transition: transform 0.16s ease;
 }
 .diff-content :deep(.d2h-file-toggle:hover) {
-  background: var(--surface3);
+  background: #2B2B2B;
   border-color: var(--accent-border);
-  color: var(--text2);
+  color: var(--diff-line);
 }
 .diff-content :deep(.d2h-file-toggle:focus-visible) {
   outline: none;
@@ -1647,87 +2042,144 @@ onBeforeUnmount(() => {
 .diff-content :deep(.d2h-diff-table) {
   width: 100%;
   border-collapse: collapse;
-  background: var(--bg) !important;
-  color: var(--text2) !important;
+  background: var(--diff-bg) !important;
+  color: var(--diff-line) !important;
   font-family: var(--font-mono);
-  font-size: 13px;
-  line-height: 1.4;
+  font-size: 12.5px;
+  line-height: 18px;
 }
-.diff-content :deep(.d2h-diff-tbody) { background: var(--bg) !important; }
-.diff-content :deep(.d2h-diff-tbody tr) { background: var(--bg) !important; }
+.diff-content :deep(.d2h-diff-tbody) { background: var(--diff-bg) !important; }
+.diff-content :deep(.d2h-diff-tbody tr) {
+  background: var(--diff-bg) !important;
+  height: 18px !important;
+}
+
+.diff-content :deep(.d2h-diff-tbody td) {
+  height: 18px !important;
+  line-height: 18px !important;
+  min-width: 0 !important;
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+  vertical-align: top !important;
+}
+.diff-content :deep(.d2h-diff-tbody td.d2h-cntx),
+.diff-content :deep(.d2h-diff-tbody td.d2h-ins),
+.diff-content :deep(.d2h-diff-tbody td.d2h-del),
+.diff-content :deep(.d2h-diff-tbody td.d2h-info) {
+  font-size: 0 !important;
+}
 
 .diff-content :deep(.d2h-code-side-linenumber),
 .diff-content :deep(.d2h-code-linenumber) {
-  position: static !important;
-  width: 7em !important;
-  min-width: 7em !important;
-  max-width: 7em !important;
-  padding: 0 10px !important;
-  background: var(--surface) !important;
-  border-color: var(--border) !important;
-  color: var(--text3) !important;
+  display: table-cell !important;
+  position: relative !important;
+  width: 88px !important;
+  min-width: 88px !important;
+  max-width: 88px !important;
+  padding: 0 20px 0 6px !important;
+  background: #151515 !important;
+  border-color: var(--diff-border) !important;
+  color: #7B8188 !important;
+  font-size: 0 !important;
+  line-height: 18px !important;
   text-align: right !important;
   vertical-align: top !important;
+  white-space: nowrap !important;
   user-select: none;
 }
+.diff-content :deep(.line-num1),
+.diff-content :deep(.line-num2) {
+  float: none !important;
+  display: inline-block !important;
+  width: 28px !important;
+  padding: 0 !important;
+  overflow: hidden;
+  font-size: 12.5px !important;
+  line-height: 18px !important;
+  text-align: right !important;
+  text-overflow: clip !important;
+  vertical-align: top !important;
+}
+.diff-content :deep(.line-num1 + .line-num2) {
+  margin-left: 4px;
+}
 .diff-content :deep(.d2h-code-line) {
-  display: block !important;
+  display: inline-block !important;
   width: auto !important;
-  padding: 0 12px !important;
-  color: var(--text2) !important;
+  padding: 0 6px !important;
+  color: var(--diff-line) !important;
   background: transparent !important;
+  font-size: 12.5px !important;
+  line-height: 18px !important;
+  vertical-align: top !important;
+  white-space: nowrap !important;
 }
 .diff-content :deep(.d2h-code-line-ctn) {
   display: inline !important;
   width: auto !important;
   color: inherit !important;
   background: transparent !important;
+  line-height: 18px !important;
+  white-space: pre !important;
 }
-.diff-content :deep(.d2h-code-line-prefix) { color: var(--text3) !important; }
+.diff-content :deep(.d2h-code-line-prefix) { color: #6C7279 !important; }
 
 .diff-content :deep(.d2h-cntx),
 .diff-content :deep(.d2h-cntx .d2h-code-line),
 .diff-content :deep(.d2h-cntx .d2h-code-line-ctn) {
-  background: var(--bg) !important;
-  color: var(--text2) !important;
+  background: var(--diff-bg) !important;
+  color: var(--diff-line) !important;
 }
-.diff-content :deep(.d2h-ins) { background: rgba(23,207,139,0.07) !important; }
+.diff-content :deep(.d2h-cntx:hover) {
+  background: #161616 !important;
+}
+.diff-content :deep(.d2h-ins) { background: var(--diff-add-bg) !important; }
 .diff-content :deep(.d2h-ins .d2h-code-line),
 .diff-content :deep(.d2h-ins .d2h-code-line-ctn) {
   background: transparent !important;
-  color: #a8f0d8 !important;
+  color: #BDFAD3 !important;
 }
-.diff-content :deep(.d2h-del) { background: rgba(229,83,75,0.07) !important; }
+.diff-content :deep(.d2h-ins .d2h-code-linenumber) {
+  background: rgba(34,197,94,0.20) !important;
+  color: #43E17C !important;
+  box-shadow: inset 3px 0 0 var(--diff-add);
+}
+.diff-content :deep(.d2h-del) { background: var(--diff-del-bg) !important; }
 .diff-content :deep(.d2h-del .d2h-code-line),
 .diff-content :deep(.d2h-del .d2h-code-line-ctn) {
   background: transparent !important;
-  color: #f5b8b4 !important;
+  color: #FFD1CD !important;
+}
+.diff-content :deep(.d2h-del .d2h-code-linenumber) {
+  background: rgba(241,93,82,0.18) !important;
+  color: #FF746B !important;
+  box-shadow: inset 3px 0 0 var(--diff-del);
 }
 .diff-content :deep(.d2h-info) {
-  background: rgba(23,207,139,0.05) !important;
-  color: var(--text2) !important;
+  background: var(--diff-muted) !important;
+  color: var(--diff-line-muted) !important;
 }
 .diff-content :deep(.d2h-info .d2h-code-line),
 .diff-content :deep(.d2h-info .d2h-code-line-ctn),
 .diff-content :deep(.d2h-info .d2h-code-linenumber) {
   background: transparent !important;
-  color: var(--text3) !important;
+  color: #A0A6AD !important;
 }
 .diff-content :deep(.d2h-code-line ins) {
-  background-color: rgba(23,207,139,0.28) !important;
+  background-color: var(--diff-add-bg2) !important;
   color: inherit !important;
   border-radius: 2px;
   text-decoration: none;
 }
 .diff-content :deep(.d2h-code-line del) {
-  background-color: rgba(229,83,75,0.28) !important;
+  background-color: var(--diff-del-bg2) !important;
   color: inherit !important;
   border-radius: 2px;
   text-decoration: none;
 }
 .diff-content :deep(.d2h-emptyplaceholder) {
-  background: var(--surface) !important;
-  border-color: var(--border) !important;
+  background: var(--diff-panel) !important;
+  border-color: var(--diff-border) !important;
 }
 .diff-content :deep(.d2h-tag) {
   display: none;
@@ -1739,32 +2191,44 @@ onBeforeUnmount(() => {
 .diff-content :deep(tr[data-commentable-line="true"]:hover td) {
   box-shadow: inset 3px 0 0 var(--accent-border);
 }
-.diff-content :deep(tr[data-commentable-line="true"]:hover .d2h-code-linenumber::after) {
+.diff-content :deep(tr[data-commentable-line="true"] .d2h-code-linenumber::after) {
   content: "+";
+  position: absolute;
+  top: 50%;
+  right: 6px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   width: 16px;
   height: 16px;
-  margin-left: 6px;
+  border: 1px solid rgba(30,214,154,0.22);
   border-radius: 4px;
-  background: var(--accent-dim);
+  background: rgba(30,214,154,0.08);
   color: var(--accent);
   font-family: var(--font-ui);
   font-size: 12px;
   font-weight: 800;
+  line-height: 1;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-50%) scale(0.86);
+  transition: opacity 0.12s ease, transform 0.12s ease, background 0.12s ease, border-color 0.12s ease;
+}
+.diff-content :deep(tr[data-commentable-line="true"]:hover .d2h-code-linenumber::after) {
+  background: var(--accent-dim);
+  border-color: var(--accent-border);
+  opacity: 1;
+  transform: translateY(-50%) scale(1);
 }
 .diff-content :deep(.inline-discussions-cell) {
-  background: rgba(23,207,139,0.035) !important;
+  background: var(--surface2) !important;
   border-top: 1px solid var(--border) !important;
   padding: 8px 12px 9px !important;
 }
 .diff-content :deep(.inline-discussion) {
   border: 1px solid var(--accent-border);
   border-radius: 8px;
-  background:
-    linear-gradient(180deg, rgba(23,207,139,0.04), transparent 58%),
-    var(--surface);
+  background: var(--surface);
   padding: 8px 10px;
   margin: 4px 0;
   color: var(--text2);
@@ -1800,4 +2264,15 @@ onBeforeUnmount(() => {
   from { opacity: 0; transform: translateY(-4px) scale(0.985); }
   to { opacity: 1; transform: translateY(0) scale(1); }
 }
+
+/* ── Syntax highlighting ── */
+.diff-content :deep(.syn-keyword)     { color: #FF8A5C; font-weight: 700; }
+.diff-content :deep(.syn-type)        { color: #9CDCFE; }
+.diff-content :deep(.syn-annotation)  { color: #DDB94F; font-weight: 700; }
+.diff-content :deep(.syn-string)      { color: #B8E986; }
+.diff-content :deep(.syn-number)      { color: #C792EA; }
+.diff-content :deep(.syn-literal)     { color: #7DD3FC; font-weight: 700; }
+.diff-content :deep(.syn-property)    { color: #7DD3FC; font-weight: 700; }
+.diff-content :deep(.syn-punctuation) { color: #A0A6AD; }
+.diff-content :deep(.syn-comment)     { color: #6A9955; font-style: italic; }
 </style>
