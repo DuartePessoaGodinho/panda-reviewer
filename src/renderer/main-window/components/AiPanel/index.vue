@@ -57,11 +57,35 @@ const mrs = useMrsStore();
 
 const repoPath   = computed(() => mrs.repoCache[props.mr.project_id] ?? null);
 const lastContext = computed(() => ai.history[0]?.context ?? '');
+let historyLoadSeq = 0;
 
 // Load history when MR changes or panel opens
 watch(() => props.mr.id, async (id) => {
+  const seq = ++historyLoadSeq;
+  const preserveRunningReview = ai.running && ai.reviewingMr?.id === id;
+  const previousView = ai.view;
+  const previousActiveEntryId = ai.activeEntry?.id ?? null;
+
   const entries = await window.api.getReviewHistory(id);
+  if (seq !== historyLoadSeq) return;
+
   ai.loadHistory(entries);
+
+  if (preserveRunningReview) {
+    ai.view = 'running';
+    return;
+  }
+
+  const activeEntry = previousActiveEntryId
+    ? entries.find(entry => entry.id === previousActiveEntryId) ?? null
+    : null;
+  if (previousView === 'reading' && activeEntry) {
+    ai.activeEntry = activeEntry;
+    ai.view = 'reading';
+    return;
+  }
+
+  ai.activeEntry = null;
   ai.view = 'history';
 }, { immediate: true });
 

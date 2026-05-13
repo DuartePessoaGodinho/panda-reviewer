@@ -73,12 +73,12 @@ function reviewPreview(output: string): string {
 .ai-hist-title { font-size: 15px; font-weight: 700; color: var(--text2); }
 .ai-new-btn {
   padding: 4px 12px;
-  background: linear-gradient(135deg, #4c1d95, #5b21b6);
-  border: 1px solid #7c3aed; color: #e9d5ff;
+  background: var(--button-primary-bg);
+  border: 1px solid var(--button-primary-border); color: var(--button-primary-text);
   border-radius: 6px; font-size: 12px; font-weight: 700; cursor: pointer;
   transition: background 0.15s;
 }
-.ai-new-btn:hover { background: linear-gradient(135deg, #5b21b6, #6d28d9); }
+.ai-new-btn:hover { background: var(--button-primary-bg-hover); }
 
 .ai-repo-warning {
   margin: 12px 16px 0; padding: 10px 12px;
@@ -110,10 +110,10 @@ function reviewPreview(output: string): string {
 
 .ai-run-btn {
   height: 34px; padding: 0 16px;
-  background: linear-gradient(135deg, #4c1d95 0%, #5b21b6 100%);
-  border: 1px solid #7c3aed; color: #e9d5ff;
+  background: var(--button-primary-bg);
+  border: 1px solid var(--button-primary-border); color: var(--button-primary-text);
   border-radius: 7px; font-size: 13px; font-weight: 700; cursor: pointer;
   transition: background 0.15s, box-shadow 0.15s; flex-shrink: 0;
 }
-.ai-run-btn:hover { background: linear-gradient(135deg, #5b21b6 0%, #6d28d9 100%); box-shadow: 0 2px 12px rgba(124,58,237,0.3); }
+.ai-run-btn:hover { background: var(--button-primary-bg-hover); box-shadow: 0 2px 12px var(--accent-glow); }
 </style>

@@ -37,8 +37,7 @@ function createMainWindow(): BrowserWindow {
     minHeight: 500,
     frame: false,
     icon: getIconPath(),
-    titleBarStyle: 'hidden',
-    backgroundColor: '#0d1117',
+    backgroundColor: '#FFFFFF',
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
@@ -319,6 +318,10 @@ ipcMain.handle('close-window', (e) => {
 
 ipcMain.handle('minimize-window', (e) => {
   BrowserWindow.fromWebContents(e.sender)?.minimize();
+});
+
+ipcMain.handle('set-theme-background', (e, theme: 'light' | 'dark') => {
+  BrowserWindow.fromWebContents(e.sender)?.setBackgroundColor(theme === 'dark' ? '#17171B' : '#FFFFFF');
 });
 
 app.whenReady().then(() => {

@@ -15,37 +15,51 @@
     <!-- Detail workspace -->
     <template v-else>
       <div class="panel-tabs">
+        <div class="primary-tabs" role="tablist" aria-label="Merge request details">
+          <button
+            class="panel-tab"
+            :class="{ active: mrs.activePanelTab === 'diff' }"
+            role="tab"
+            :aria-selected="mrs.activePanelTab === 'diff'"
+            @click="showDiff"
+          >
+            <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+              <path d="M14 1H2a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V2a1 1 0 0 0-1-1zM2 0a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V2a2 2 0 0 0-2-2H2z"/>
+              <path d="M5 10.5a.5.5 0 0 1 .5-.5h5a.5.5 0 0 1 0 1h-5a.5.5 0 0 1-.5-.5zm0-3a.5.5 0 0 1 .5-.5h7a.5.5 0 0 1 0 1h-7a.5.5 0 0 1-.5-.5zm0-3a.5.5 0 0 1 .5-.5h7a.5.5 0 0 1 0 1h-7a.5.5 0 0 1-.5-.5z"/>
+            </svg>
+            Diff
+          </button>
+          <button
+            class="panel-tab"
+            :class="{ active: mrs.activePanelTab === 'comments' }"
+            role="tab"
+            :aria-selected="mrs.activePanelTab === 'comments'"
+            @click="showComments"
+          >
+            <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+              <path d="M2 3.5A2.5 2.5 0 0 1 4.5 1h7A2.5 2.5 0 0 1 14 3.5v4A2.5 2.5 0 0 1 11.5 10H7.9l-3.2 2.4A.45.45 0 0 1 4 12.04V10A2 2 0 0 1 2 8V3.5Z"/>
+            </svg>
+            Comments
+            <span v-if="commentTabCount > 0" class="panel-tab-count">{{ commentTabCount }}</span>
+          </button>
+        </div>
         <button
-          class="panel-tab"
-          :class="{ active: mrs.activePanelTab === 'diff' }"
-          @click="showDiff"
-        >
-          <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
-            <path d="M14 1H2a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V2a1 1 0 0 0-1-1zM2 0a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V2a2 2 0 0 0-2-2H2z"/>
-            <path d="M5 10.5a.5.5 0 0 1 .5-.5h5a.5.5 0 0 1 0 1h-5a.5.5 0 0 1-.5-.5zm0-3a.5.5 0 0 1 .5-.5h7a.5.5 0 0 1 0 1h-7a.5.5 0 0 1-.5-.5zm0-3a.5.5 0 0 1 .5-.5h7a.5.5 0 0 1 0 1h-7a.5.5 0 0 1-.5-.5z"/>
-          </svg>
-          Diff
-        </button>
-        <button
-          class="panel-tab ai-tab"
-          :class="{ active: mrs.activePanelTab === 'comments' }"
-          @click="showComments"
-        >
-          <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
-            <path d="M2 3.5A2.5 2.5 0 0 1 4.5 1h7A2.5 2.5 0 0 1 14 3.5v4A2.5 2.5 0 0 1 11.5 10H7.9l-3.2 2.4A.45.45 0 0 1 4 12.04V10A2 2 0 0 1 2 8V3.5Z"/>
-          </svg>
-          Comments
-          <span v-if="commentTabCount > 0" class="panel-tab-count">{{ commentTabCount }}</span>
-        </button>
-        <button
-          class="panel-tab ai-tab"
-          :class="{ active: mrs.activePanelTab === 'ai' }"
+          class="ai-drawer-trigger"
+          :class="{ open: aiReviewOpen, 'has-history': shouldShowAiHistoryNotice }"
+          :aria-pressed="aiReviewOpen"
+          :aria-expanded="aiReviewOpen"
+          :title="aiReviewTitle"
           @click="toggleAiReview"
         >
           <svg width="11" height="11" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
             <path d="M8 0l1.5 5H16l-4.5 3.5L13 14 8 10l-5 4 1.5-5.5L0 5h6.5L8 0z"/>
           </svg>
-          AI Review
+          <span>{{ aiReviewOpen ? 'Hide AI Review' : 'AI Review' }}</span>
+          <span
+            v-if="shouldShowAiHistoryNotice"
+            class="ai-history-notice"
+            :aria-label="`${aiHistoryCount} saved AI review${aiHistoryCount === 1 ? '' : 's'} available`"
+          >{{ aiHistoryCount }}</span>
         </button>
       </div>
 
@@ -128,6 +142,26 @@
                   New changes
                 </button>
               </div>
+              <div class="file-view-tabs" role="group" aria-label="Changed files view">
+                <button
+                  class="file-view-tab"
+                  :class="{ active: fileListView === 'list' }"
+                  :aria-pressed="fileListView === 'list'"
+                  title="Show changed files as a flat list"
+                  @click="fileListView = 'list'"
+                >
+                  List
+                </button>
+                <button
+                  class="file-view-tab"
+                  :class="{ active: fileListView === 'tree' }"
+                  :aria-pressed="fileListView === 'tree'"
+                  title="Show changed files grouped by folder"
+                  @click="fileListView = 'tree'"
+                >
+                  Tree
+                </button>
+              </div>
               <div class="checkpoint-status">
                 <template v-if="checkpoint">
                   <span class="checkpoint-state-dot"></span>
@@ -152,11 +186,39 @@
             </div>
             <div
               class="diff-content"
+              :class="{ 'tree-split': fileListView === 'tree' }"
               ref="diffContentRef"
-              @click="handleDiffContentClick"
-              @keydown="handleDiffContentKeydown"
-              v-html="diffHtml"
-            ></div>
+            >
+              <template v-if="fileListView === 'tree'">
+                <nav
+                  class="diff-tree-pane"
+                  :style="diffTreePaneStyle"
+                  aria-label="Changed files"
+                  @click="handleFileTreeClick"
+                  v-html="diffTreeHtml"
+                ></nav>
+                <div
+                  class="diff-tree-resize-handle"
+                  title="Resize file tree"
+                  role="separator"
+                  aria-orientation="vertical"
+                  @pointerdown="startDiffTreeResize"
+                ></div>
+                <div
+                  class="diff-body-pane"
+                  @click="handleDiffContentClick"
+                  @keydown="handleDiffContentKeydown"
+                  v-html="diffBodyHtml"
+                ></div>
+              </template>
+              <div
+                v-else
+                class="diff-html-pane"
+                @click="handleDiffContentClick"
+                @keydown="handleDiffContentKeydown"
+                v-html="diffHtml"
+              ></div>
+            </div>
             <div
               v-if="inlineDraft"
               class="inline-comment-popover"
@@ -257,28 +319,40 @@ import { renderMarkdown } from '../utils';
 const props = defineProps<{ aiEnabled: boolean; providerLabel: string }>();
 
 type DiffMode = 'full' | 'new';
+type FileListView = 'list' | 'tree';
 const AI_DRAWER_WIDTH_STORAGE_KEY = 'aiDrawerWidth';
+const FILE_LIST_VIEW_STORAGE_KEY = 'diffFileListView';
+const DIFF_TREE_WIDTH_STORAGE_KEY = 'diffTreeWidth';
 const AI_DRAWER_RAIL_WIDTH = 42;
 const AI_DRAWER_MIN_WIDTH = 380;
 const AI_DRAWER_DEFAULT_WIDTH = 440;
+const DIFF_TREE_MIN_WIDTH = 260;
+const DIFF_TREE_MAX_WIDTH = 640;
+const DIFF_TREE_DEFAULT_WIDTH = 420;
 
 const mrs = useMrsStore();
 const loadingDiff = ref(false);
 const diffError   = ref(false);
 const diffHtml    = ref('');
+const diffTreeHtml = ref('');
+const diffBodyHtml = ref('');
 const diffStats   = ref({ files: 0, added: 0, deleted: 0 });
 const diffMode    = ref<DiffMode>('full');
+const fileListView = ref<FileListView>(loadFileListView());
 const checkpoint = computed(() => mrs.activeMr ? mrs.reviewCheckpoints[mrs.activeMr.id] ?? null : null);
 const markingReviewed = ref(false);
 const isCompact = ref(false);
 const aiDrawerWidth = ref(loadAiDrawerWidth());
+const diffTreeWidth = ref(loadDiffTreeWidth());
 const aiDrawerFullscreen = ref(false);
 const isResizingAiDrawer = ref(false);
+const isResizingDiffTree = ref(false);
 const comments = useCommentsStore();
 const currentChanges = ref<any[]>([]);
 const currentCombinedDiff = ref('');
 const currentPositionLookup = ref<Map<string, DiffLinePosition>>(new Map());
 const diffContentRef = ref<HTMLElement | null>(null);
+const aiHistoryCount = ref(0);
 const inlineBody = ref('');
 const inlineError = ref('');
 const inlineDraft = ref<{
@@ -291,6 +365,8 @@ const inlineDraft = ref<{
   new_line?: number;
 } | null>(null);
 let compactQuery: MediaQueryList | null = null;
+let stopDiffTreeResize: (() => void) | null = null;
+let aiHistorySeq = 0;
 type DiffLinePosition = {
   old_path: string;
   new_path: string;
@@ -305,6 +381,16 @@ const commentState = computed(() => comments.getState(mrs.activeMr));
 const commentTabCount = computed(() =>
   commentState.value.discussions.filter(discussion => discussion.notes.some(note => !note.system)).length
 );
+const aiReviewOpen = computed(() =>
+  isCompact.value ? mrs.activePanelTab === 'ai' : mrs.aiDrawerOpen || aiDrawerFullscreen.value
+);
+const shouldShowAiHistoryNotice = computed(() => aiHistoryCount.value > 0 && !aiReviewOpen.value);
+const aiReviewTitle = computed(() => {
+  if (aiReviewOpen.value) return 'Hide AI Review';
+  if (aiHistoryCount.value === 1) return 'Show AI Review - 1 saved review available';
+  if (aiHistoryCount.value > 1) return `Show AI Review - ${aiHistoryCount.value} saved reviews available`;
+  return 'Show AI Review';
+});
 const shouldShowDiff = computed(() =>
   Boolean(mrs.activeMr && mrs.activePanelTab !== 'comments' && (!isCompact.value || mrs.activePanelTab === 'diff'))
 );
@@ -343,6 +429,9 @@ const aiDrawerBodyStyle = computed<CSSProperties>(() => {
   if (aiDrawerFullscreen.value) return {};
   return { width: `${Math.max(0, aiDrawerWidth.value - AI_DRAWER_RAIL_WIDTH)}px` };
 });
+const diffTreePaneStyle = computed<CSSProperties>(() => ({
+  flexBasis: `${diffTreeWidth.value}px`,
+}));
 
 function loadAiDrawerWidth() {
   const saved = Number(localStorage.getItem(AI_DRAWER_WIDTH_STORAGE_KEY));
@@ -361,13 +450,34 @@ function saveAiDrawerWidth(width: number) {
   localStorage.setItem(AI_DRAWER_WIDTH_STORAGE_KEY, String(width));
 }
 
+function loadDiffTreeWidth() {
+  const saved = Number(localStorage.getItem(DIFF_TREE_WIDTH_STORAGE_KEY));
+  return Number.isFinite(saved) ? saved : DIFF_TREE_DEFAULT_WIDTH;
+}
+
+function maxDiffTreeWidth() {
+  const containerWidth = diffContentRef.value?.clientWidth ?? window.innerWidth;
+  return Math.min(DIFF_TREE_MAX_WIDTH, Math.max(DIFF_TREE_MIN_WIDTH, Math.floor(containerWidth * 0.48)));
+}
+
+function clampDiffTreeWidth(width: number) {
+  return Math.min(maxDiffTreeWidth(), Math.max(DIFF_TREE_MIN_WIDTH, Math.round(width)));
+}
+
+function saveDiffTreeWidth(width: number) {
+  localStorage.setItem(DIFF_TREE_WIDTH_STORAGE_KEY, String(width));
+}
+
+function loadFileListView(): FileListView {
+  return localStorage.getItem(FILE_LIST_VIEW_STORAGE_KEY) === 'tree' ? 'tree' : 'list';
+}
+
 function shortSha(sha: string) {
   return sha ? sha.slice(0, 8) : '';
 }
 
 function showDiff() {
   mrs.setActivePanelTab('diff');
-  if (!isCompact.value) mrs.setAiDrawerOpen(false);
 }
 
 function showComments() {
@@ -378,18 +488,21 @@ function showComments() {
 
 function toggleAiReview() {
   if (!isCompact.value) {
-    const nextOpen = !mrs.aiDrawerOpen;
+    const nextOpen = !aiReviewOpen.value;
     if (!nextOpen) aiDrawerFullscreen.value = false;
     mrs.setAiDrawerOpen(nextOpen);
-    mrs.setActivePanelTab(nextOpen ? 'ai' : 'diff');
+    if (nextOpen) mrs.setActivePanelTab('diff');
     return;
   }
-  mrs.setActivePanelTab('ai');
+  mrs.setActivePanelTab(mrs.activePanelTab === 'ai' ? 'diff' : 'ai');
 }
 
 function updateCompactState(event: MediaQueryListEvent | MediaQueryList) {
   isCompact.value = event.matches;
   if (event.matches) aiDrawerFullscreen.value = false;
+  if (!event.matches && mrs.activePanelTab === 'ai') mrs.setActivePanelTab('diff');
+  if (event.matches && mrs.aiDrawerOpen) mrs.setActivePanelTab('ai');
+  diffTreeWidth.value = clampDiffTreeWidth(diffTreeWidth.value);
 }
 
 function closeAiDrawer() {
@@ -403,7 +516,7 @@ function toggleAiDrawerFullscreen() {
   aiDrawerFullscreen.value = nextFullscreen;
   if (nextFullscreen) {
     mrs.setAiDrawerOpen(true);
-    mrs.setActivePanelTab('ai');
+    mrs.setActivePanelTab('diff');
   }
 }
 
@@ -435,7 +548,47 @@ function startAiDrawerResize(event: PointerEvent) {
   window.addEventListener('pointercancel', onPointerUp);
 }
 
+function startDiffTreeResize(event: PointerEvent) {
+  if (fileListView.value !== 'tree') return;
+
+  event.preventDefault();
+  stopDiffTreeResize?.();
+  const startX = event.clientX;
+  const startWidth = diffTreeWidth.value;
+  const handle = event.currentTarget as HTMLElement | null;
+  isResizingDiffTree.value = true;
+  document.body.classList.add('diff-tree-resizing');
+  handle?.setPointerCapture?.(event.pointerId);
+
+  const onPointerMove = (moveEvent: PointerEvent) => {
+    diffTreeWidth.value = clampDiffTreeWidth(startWidth + moveEvent.clientX - startX);
+  };
+
+  const onPointerUp = () => {
+    handle?.releasePointerCapture?.(event.pointerId);
+    isResizingDiffTree.value = false;
+    document.body.classList.remove('diff-tree-resizing');
+    diffTreeWidth.value = clampDiffTreeWidth(diffTreeWidth.value);
+    saveDiffTreeWidth(diffTreeWidth.value);
+    window.removeEventListener('pointermove', onPointerMove);
+    window.removeEventListener('pointerup', onPointerUp);
+    window.removeEventListener('pointercancel', onPointerUp);
+    handle?.removeEventListener('lostpointercapture', onPointerUp);
+    stopDiffTreeResize = null;
+  };
+
+  stopDiffTreeResize = onPointerUp;
+  window.addEventListener('pointermove', onPointerMove);
+  window.addEventListener('pointerup', onPointerUp);
+  window.addEventListener('pointercancel', onPointerUp);
+  handle?.addEventListener('lostpointercapture', onPointerUp, { once: true });
+}
+
 function handleGlobalKeydown(event: KeyboardEvent) {
+  if (event.key === 'Escape' && isResizingDiffTree.value) {
+    stopDiffTreeResize?.();
+    return;
+  }
   if (event.key === 'Escape' && aiDrawerFullscreen.value) {
     aiDrawerFullscreen.value = false;
   }
@@ -492,7 +645,192 @@ function applyLanguageTheme(element: Element, theme: LanguageTheme | null) {
   element.classList.add(theme.className, 'has-language-theme');
 }
 
-function makeDiffFilesCollapsible(html: string) {
+type FileTreeNode = {
+  name: string;
+  path: string;
+  children: Map<string, FileTreeNode>;
+  files: Array<{
+    path: string;
+    name: string;
+    href: string;
+    added: number;
+    deleted: number;
+    theme: LanguageTheme | null;
+  }>;
+  added: number;
+  deleted: number;
+  fileCount: number;
+};
+
+function createFileTreeNode(name: string, path: string): FileTreeNode {
+  return {
+    name,
+    path,
+    children: new Map(),
+    files: [],
+    added: 0,
+    deleted: 0,
+    fileCount: 0,
+  };
+}
+
+function parseFileListStat(li: Element, selector: string) {
+  const text = li.querySelector(selector)?.textContent ?? '';
+  return Number(text.replace(/[^\d]/g, '')) || 0;
+}
+
+function appendTreeStats(doc: Document, parent: Element, added: number, deleted: number) {
+  const stats = doc.createElement('span');
+  stats.className = 'd2h-file-tree-stats';
+
+  const addedBadge = doc.createElement('span');
+  addedBadge.className = 'd2h-lines-added';
+  addedBadge.textContent = `+${added}`;
+
+  const deletedBadge = doc.createElement('span');
+  deletedBadge.className = 'd2h-lines-deleted';
+  deletedBadge.textContent = `-${deleted}`;
+
+  stats.append(addedBadge, deletedBadge);
+  parent.appendChild(stats);
+}
+
+function appendFileTreeNode(doc: Document, parent: Element, node: FileTreeNode, depth: number) {
+  const compactedNames = [node.name];
+  let current = node;
+
+  while (current.files.length === 0 && current.children.size === 1) {
+    const onlyChild = Array.from(current.children.values())[0];
+    compactedNames.push(onlyChild.name);
+    current = onlyChild;
+  }
+
+  const details = doc.createElement('details');
+  details.className = 'd2h-file-tree-dir';
+  details.open = true;
+  details.style.setProperty('--tree-depth', String(depth));
+
+  const summary = doc.createElement('summary');
+  summary.className = 'd2h-file-tree-dir-row';
+
+  const name = doc.createElement('span');
+  name.className = 'd2h-file-tree-dir-name';
+  name.textContent = compactedNames.join('/');
+  name.setAttribute('title', current.path);
+
+  const count = doc.createElement('span');
+  count.className = 'd2h-file-tree-count';
+  count.textContent = `${current.fileCount} ${current.fileCount === 1 ? 'file' : 'files'}`;
+
+  summary.append(name, count);
+  appendTreeStats(doc, summary, current.added, current.deleted);
+  details.appendChild(summary);
+
+  const children = doc.createElement('div');
+  children.className = 'd2h-file-tree-children';
+
+  Array.from(current.children.values())
+    .sort((a, b) => a.name.localeCompare(b.name))
+    .forEach(child => appendFileTreeNode(doc, children, child, depth + 1));
+
+  current.files
+    .sort((a, b) => a.name.localeCompare(b.name))
+    .forEach(file => {
+      const row = doc.createElement('a');
+      row.className = 'd2h-file-tree-file';
+      row.href = file.href;
+      row.style.setProperty('--tree-depth', String(depth + 1));
+      row.setAttribute('title', file.path);
+      applyLanguageTheme(row, file.theme);
+
+      const label = doc.createElement('span');
+      label.className = 'd2h-file-tree-file-name';
+      label.textContent = file.name;
+
+      row.appendChild(label);
+      appendTreeStats(doc, row, file.added, file.deleted);
+      children.appendChild(row);
+    });
+
+  details.appendChild(children);
+  parent.appendChild(details);
+}
+
+function makeDiffFileListTree(doc: Document) {
+  const wrapper = doc.querySelector('.d2h-file-list-wrapper');
+  const list = wrapper?.querySelector('.d2h-file-list');
+  if (!wrapper || !list) return;
+
+  const root = createFileTreeNode('', '');
+  list.querySelectorAll(':scope > li').forEach((li) => {
+    const path = li.querySelector('.d2h-file-name')?.textContent?.trim() ?? '';
+    if (!path) return;
+
+    const parts = path.split('/').filter(Boolean);
+    const fileName = parts.pop() ?? path;
+    const added = parseFileListStat(li, '.d2h-lines-added');
+    const deleted = parseFileListStat(li, '.d2h-lines-deleted');
+    let node = root;
+
+    node.fileCount += 1;
+    node.added += added;
+    node.deleted += deleted;
+
+    for (const part of parts) {
+      const childPath = node.path ? `${node.path}/${part}` : part;
+      let child = node.children.get(part);
+      if (!child) {
+        child = createFileTreeNode(part, childPath);
+        node.children.set(part, child);
+      }
+      child.fileCount += 1;
+      child.added += added;
+      child.deleted += deleted;
+      node = child;
+    }
+
+    node.files.push({
+      path,
+      name: fileName,
+      href: li.querySelector('a')?.getAttribute('href') ?? '#',
+      added,
+      deleted,
+      theme: getLanguageTheme(path),
+    });
+  });
+
+  const tree = doc.createElement('div');
+  tree.className = 'd2h-file-tree';
+
+  Array.from(root.children.values())
+    .sort((a, b) => a.name.localeCompare(b.name))
+    .forEach(child => appendFileTreeNode(doc, tree, child, 0));
+
+  root.files
+    .sort((a, b) => a.name.localeCompare(b.name))
+    .forEach(file => {
+      const row = doc.createElement('a');
+      row.className = 'd2h-file-tree-file';
+      row.href = file.href;
+      row.style.setProperty('--tree-depth', '0');
+      row.setAttribute('title', file.path);
+      applyLanguageTheme(row, file.theme);
+
+      const label = doc.createElement('span');
+      label.className = 'd2h-file-tree-file-name';
+      label.textContent = file.name;
+
+      row.appendChild(label);
+      appendTreeStats(doc, row, file.added, file.deleted);
+      tree.appendChild(row);
+    });
+
+  wrapper.classList.add('tree-view');
+  list.replaceWith(tree);
+
+}
+
+function makeDiffFilesCollapsible(html: string, view: FileListView) {
   const doc = new DOMParser().parseFromString(`<div>${html}</div>`, 'text/html');
 
   doc.querySelectorAll('.d2h-file-wrapper').forEach((file) => {
@@ -525,6 +863,8 @@ function makeDiffFilesCollapsible(html: string) {
     const fileName = li.querySelector('.d2h-file-name')?.textContent?.trim() ?? '';
     applyLanguageTheme(li, getLanguageTheme(fileName));
   });
+
+  if (view === 'tree') makeDiffFileListTree(doc);
 
   return doc.body.firstElementChild?.innerHTML ?? html;
 }
@@ -925,6 +1265,35 @@ function findToggleFile(target: HTMLElement | null) {
   return control?.closest('.d2h-file-wrapper') ?? null;
 }
 
+function scrollTreeFileIntoView(link: HTMLAnchorElement) {
+  const href = link.getAttribute('href') ?? '';
+  if (!href.startsWith('#')) return false;
+
+  const id = decodeURIComponent(href.slice(1));
+  const root = diffContentRef.value;
+  const target = id ? document.getElementById(id) : null;
+  if (!root || !target || !root.contains(target)) return false;
+
+  const scrollPane = target.closest<HTMLElement>('.diff-body-pane') ?? root;
+  const paneRect = scrollPane.getBoundingClientRect();
+  const targetRect = target.getBoundingClientRect();
+
+  scrollPane.scrollTo({
+    top: scrollPane.scrollTop + targetRect.top - paneRect.top - 8,
+    left: 0,
+    behavior: 'smooth',
+  });
+  return true;
+}
+
+function handleFileTreeClick(event: MouseEvent) {
+  const treeLink = (event.target as HTMLElement | null)?.closest<HTMLAnchorElement>('.d2h-file-tree-file');
+  if (!treeLink) return;
+
+  event.preventDefault();
+  scrollTreeFileIntoView(treeLink);
+}
+
 function parseDiffStats(diff: string) {
   const files = (diff.match(/^diff --git /gm) ?? []).length;
   return {
@@ -940,8 +1309,19 @@ function renderDiff(diff: string, changes = currentChanges.value) {
     drawFileList: true,
     outputFormat: 'line-by-line',
     renderNothingWhenEmpty: false,
-  }));
-  diffHtml.value = decorateDiffHtml(html, changes, commentState.value.discussions);
+  }), fileListView.value);
+  const decoratedHtml = decorateDiffHtml(html, changes, commentState.value.discussions);
+  diffHtml.value = decoratedHtml;
+
+  if (fileListView.value === 'tree') {
+    const doc = new DOMParser().parseFromString(`<div>${decoratedHtml}</div>`, 'text/html');
+    diffTreeHtml.value = doc.querySelector('.d2h-file-list-wrapper')?.outerHTML ?? '';
+    doc.querySelector('.d2h-file-list-wrapper')?.remove();
+    diffBodyHtml.value = doc.body.firstElementChild?.innerHTML ?? '';
+  } else {
+    diffTreeHtml.value = '';
+    diffBodyHtml.value = '';
+  }
 }
 
 function fullDiffFromChanges(changes: any[]) {
@@ -957,6 +1337,8 @@ async function loadDiff() {
   loadingDiff.value = true;
   diffError.value   = false;
   diffHtml.value    = '';
+  diffTreeHtml.value = '';
+  diffBodyHtml.value = '';
   diffStats.value   = { files: 0, added: 0, deleted: 0 };
 
   try {
@@ -976,7 +1358,7 @@ async function loadDiff() {
           drawFileList: true,
           outputFormat: 'line-by-line',
           renderNothingWhenEmpty: false,
-        }));
+        }), 'list');
         currentPositionLookup.value = extractDiffLinePositions(fullHtml, fullChanges);
         currentChanges.value = changes;
         currentCombinedDiff.value = fullDiffFromChanges(changes);
@@ -1090,6 +1472,16 @@ async function submitInlineComment() {
   }
 }
 
+async function loadAiHistoryNotice(mrId: number) {
+  const seq = ++aiHistorySeq;
+  aiHistoryCount.value = 0;
+
+  const history = await window.api.getReviewHistory(mrId);
+  if (seq !== aiHistorySeq || mrs.activeMr?.id !== mrId) return;
+
+  aiHistoryCount.value = history.length;
+}
+
 watch(
   () => [mrs.activeMr?.id, mrs.activeMr?.sha, shouldShowDiff.value] as const,
   async ([mrId, _sha, canShowDiff]) => {
@@ -1108,10 +1500,43 @@ watch(
 );
 
 watch(
+  () => fileListView.value,
+  (view) => {
+    localStorage.setItem(FILE_LIST_VIEW_STORAGE_KEY, view);
+    if (view === 'tree') diffTreeWidth.value = clampDiffTreeWidth(diffTreeWidth.value);
+    if (currentCombinedDiff.value && shouldShowDiff.value) {
+      renderDiff(currentCombinedDiff.value);
+    }
+  }
+);
+
+watch(
   () => hasNewChanges.value,
   (available) => {
     if (!available && diffMode.value === 'new') diffMode.value = 'full';
   }
+);
+
+watch(
+  () => [mrs.aiDrawerOpen, isCompact.value] as const,
+  ([drawerOpen, compact]) => {
+    if (compact && drawerOpen) mrs.setActivePanelTab('ai');
+    if (!compact && mrs.activePanelTab === 'ai') mrs.setActivePanelTab('diff');
+  },
+  { immediate: true }
+);
+
+watch(
+  () => mrs.activeMr?.id,
+  (mrId) => {
+    if (!mrId) {
+      aiHistorySeq++;
+      aiHistoryCount.value = 0;
+      return;
+    }
+    void loadAiHistoryNotice(mrId);
+  },
+  { immediate: true }
 );
 
 watch(
@@ -1133,9 +1558,11 @@ onMounted(() => {
 });
 
 onBeforeUnmount(() => {
+  stopDiffTreeResize?.();
   compactQuery?.removeEventListener('change', updateCompactState);
   window.removeEventListener('keydown', handleGlobalKeydown);
   document.body.classList.remove('ai-drawer-resizing');
+  document.body.classList.remove('diff-tree-resizing');
 });
 </script>
 
@@ -1203,11 +1630,19 @@ onBeforeUnmount(() => {
 .panel-tabs {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   border-bottom: 1px solid var(--border);
   background: linear-gradient(180deg, var(--surface2) 0%, var(--surface) 100%);
   padding: 10px 14px 9px;
   flex-shrink: 0;
   min-height: 52px;
+  gap: 12px;
+}
+
+.primary-tabs {
+  display: flex;
+  align-items: center;
+  min-width: 0;
   gap: 4px;
 }
 
@@ -1292,10 +1727,84 @@ onBeforeUnmount(() => {
   opacity: 1;
   color: var(--accent);
 }
-.panel-tab.ai-tab.active {
-  background: linear-gradient(180deg, rgba(30,214,154,0.12), rgba(30,214,154,0.06));
-  border-color: var(--accent-border);
+.ai-drawer-trigger {
+  position: relative;
+  flex-shrink: 0;
+  height: 32px;
+  min-width: 126px;
+  padding: 0 13px;
+  border: 1px solid var(--accent-border);
+  border-radius: var(--radius-sm);
+  background: rgba(30,214,154,0.08);
+  color: var(--text2);
+  font-family: var(--font-ui);
+  font-size: 12.5px;
+  font-weight: 700;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  transition: background var(--dur-fast), border-color var(--dur-fast), color var(--dur-fast), box-shadow var(--dur-fast), transform var(--dur-fast) var(--ease-spring);
+}
+
+.ai-drawer-trigger svg {
+  width: 13px;
+  height: 13px;
+  color: var(--accent);
+}
+
+.ai-drawer-trigger:hover {
+  background: rgba(30,214,154,0.14);
+  border-color: var(--accent);
   color: var(--text);
+  box-shadow: 0 0 16px var(--accent-glow);
+  transform: translateY(-1px);
+}
+
+.ai-drawer-trigger:active {
+  transform: scale(0.97);
+}
+
+.ai-drawer-trigger:focus-visible {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-bg);
+}
+
+.ai-drawer-trigger.open {
+  background: linear-gradient(180deg, rgba(30,214,154,0.18), rgba(30,214,154,0.08));
+  border-color: var(--accent);
+  color: var(--text);
+  box-shadow: inset 0 -2px 0 var(--accent);
+}
+
+.ai-drawer-trigger.has-history {
+  border-color: color-mix(in srgb, var(--accent) 82%, var(--border));
+  background: rgba(30,214,154,0.12);
+  box-shadow: 0 0 0 3px var(--accent-bg);
+}
+
+.ai-history-notice {
+  position: absolute;
+  top: -7px;
+  right: -7px;
+  min-width: 17px;
+  height: 17px;
+  padding: 0 5px;
+  border: 2px solid var(--surface);
+  border-radius: 999px;
+  background: var(--accent);
+  color: var(--bg);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-ui);
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 1;
+  box-shadow: 0 0 12px var(--accent-glow);
+  pointer-events: none;
 }
 
 /* Panel tab content transition */
@@ -1490,7 +1999,7 @@ onBeforeUnmount(() => {
   flex-shrink: 0;
   padding: 9px 14px;
   border-bottom: 1px solid var(--diff-border);
-  background: linear-gradient(180deg, #191919 0%, #141414 100%);
+  background: linear-gradient(180deg, var(--diff-panel2) 0%, var(--diff-panel) 100%);
   display: flex;
   align-items: center;
   gap: 14px;
@@ -1502,7 +2011,7 @@ onBeforeUnmount(() => {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  color: #F0F3F6;
+  color: var(--diff-strong);
   font-size: 14px;
   font-weight: 600;
   letter-spacing: -0.02em;
@@ -1514,16 +2023,16 @@ onBeforeUnmount(() => {
   gap: 1px;
   flex-shrink: 0;
   overflow: hidden;
-  border: 1px solid #303030;
+  border: 1px solid var(--diff-border);
   border-radius: 6px;
-  background: #303030;
+  background: var(--diff-border);
 }
 
 .diff-stat {
   min-width: 66px;
   min-height: 30px;
   padding: 5px 8px 4px;
-  background: linear-gradient(180deg, #202020, #181818);
+  background: linear-gradient(180deg, var(--diff-panel2), var(--diff-panel));
   color: var(--diff-line-muted);
   display: flex;
   flex-direction: column;
@@ -1536,7 +2045,7 @@ onBeforeUnmount(() => {
   font-size: 13px;
   line-height: 1;
   font-weight: 700;
-  color: #E8EDF2;
+  color: var(--diff-strong);
   letter-spacing: 0;
 }
 
@@ -1609,7 +2118,7 @@ onBeforeUnmount(() => {
   padding: 2px;
   border: 1px solid var(--diff-border);
   border-radius: 7px;
-  background: #0F0F0F;
+  background: var(--diff-bg);
   flex-shrink: 0;
 }
 
@@ -1631,17 +2140,58 @@ onBeforeUnmount(() => {
 
 .diff-mode-tab:hover:not(:disabled) {
   color: var(--diff-line);
-  background: #222222;
+  background: var(--diff-toggle-hover);
 }
 
 .diff-mode-tab.active {
-  color: #F0F3F6;
-  background: #2B2B2B;
+  color: var(--diff-strong);
+  background: var(--diff-toggle-bg);
 }
 
 .diff-mode-tab:disabled {
   opacity: 0.36;
   cursor: not-allowed;
+}
+
+.file-view-tabs {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px;
+  border: 1px solid var(--diff-border);
+  border-radius: 7px;
+  background: var(--diff-bg);
+  flex-shrink: 0;
+}
+
+.file-view-tab {
+  height: 26px;
+  min-width: 48px;
+  padding: 0 9px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--text3);
+  cursor: pointer;
+  font-family: var(--font-ui);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0;
+  transition: background 0.12s, color 0.12s;
+}
+
+.file-view-tab:hover {
+  color: var(--diff-line);
+  background: var(--diff-toggle-hover);
+}
+
+.file-view-tab.active {
+  color: var(--diff-strong);
+  background: var(--diff-toggle-bg);
+}
+
+.file-view-tab:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--accent-bg);
 }
 
 .checkpoint-status {
@@ -1772,6 +2322,64 @@ onBeforeUnmount(() => {
   user-select: text;
 }
 
+.diff-content.tree-split {
+  overflow: hidden;
+  display: flex;
+  align-items: stretch;
+  gap: 0;
+}
+
+.diff-tree-pane {
+  flex: 0 0 320px;
+  min-width: 0;
+  min-height: 0;
+  align-self: stretch;
+  overflow: auto;
+}
+
+.diff-tree-resize-handle {
+  position: relative;
+  flex: 0 0 12px;
+  align-self: stretch;
+  cursor: col-resize;
+}
+
+.diff-tree-resize-handle::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 5px;
+  width: 1px;
+  background: var(--diff-border);
+  transition: background var(--dur-fast), box-shadow var(--dur-fast), width var(--dur-fast);
+}
+
+.diff-tree-resize-handle:hover::after,
+:global(body.diff-tree-resizing) .diff-tree-resize-handle::after {
+  width: 2px;
+  background: var(--accent);
+  box-shadow: 0 0 12px var(--accent-glow);
+}
+
+:global(body.diff-tree-resizing),
+:global(body.diff-tree-resizing *) {
+  cursor: col-resize !important;
+  user-select: none !important;
+}
+
+.diff-body-pane {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  align-self: stretch;
+  overflow: auto;
+}
+
+.diff-html-pane {
+  min-width: 0;
+}
+
 .inline-comment-popover {
   position: absolute;
   z-index: 20;
@@ -1888,6 +2496,8 @@ onBeforeUnmount(() => {
 .diff-content :deep(.d2h-wrapper) {
   background: transparent !important;
   color: var(--diff-line) !important;
+  min-width: 0;
+  width: 100%;
 }
 .diff-content :deep(.d2h-file-list-wrapper) {
   background: var(--diff-panel) !important;
@@ -1899,7 +2509,7 @@ onBeforeUnmount(() => {
 .diff-content :deep(.d2h-file-list-header) {
   background: var(--diff-panel2) !important;
   border-bottom: 1px solid var(--diff-border) !important;
-  color: #E8EDF2 !important;
+  color: var(--diff-strong) !important;
 }
 .diff-content :deep(.d2h-file-list-title),
 .diff-content :deep(.d2h-file-list-line) {
@@ -1913,7 +2523,7 @@ onBeforeUnmount(() => {
   border-color: var(--diff-border) !important;
 }
 .diff-content :deep(.d2h-file-list > li:hover) {
-  background: #202020 !important;
+  background: var(--diff-line-hover) !important;
 }
 .diff-content :deep(.d2h-file-list a) {
   color: var(--accent) !important;
@@ -1947,15 +2557,165 @@ onBeforeUnmount(() => {
   box-shadow: inset 0 1px 0 rgba(255,255,255,0.04);
 }
 .diff-content :deep(.d2h-file-list-line .d2h-lines-added) {
-  background: rgba(34,197,94,0.13);
-  border-color: rgba(34,197,94,0.32) !important;
-  color: #43E17C !important;
+  background: var(--diff-add-bg);
+  border-color: var(--accent-border) !important;
+  color: var(--diff-add-text) !important;
 }
 .diff-content :deep(.d2h-file-list-line .d2h-lines-deleted) {
-  background: rgba(241,93,82,0.12);
-  border-color: rgba(241,93,82,0.32) !important;
-  color: #FF746B !important;
+  background: var(--diff-del-bg);
+  border-color: color-mix(in srgb, var(--diff-del) 34%, transparent) !important;
+  color: var(--diff-del-text) !important;
   margin-left: 0 !important;
+}
+.diff-content :deep(.d2h-file-list-wrapper.tree-view) {
+  overflow: hidden;
+}
+.diff-tree-pane :deep(.d2h-file-list-wrapper.tree-view) {
+  min-height: 100%;
+  height: auto;
+  margin: 0 !important;
+  overflow: visible;
+}
+.diff-body-pane :deep(.d2h-file-wrapper:first-child) {
+  margin-top: 0 !important;
+}
+.diff-content :deep(.d2h-file-tree) {
+  background: var(--diff-panel) !important;
+  padding: 4px 0;
+}
+.diff-content :deep(.d2h-file-tree-dir) {
+  display: block;
+}
+.diff-content :deep(.d2h-file-tree-dir-row),
+.diff-content :deep(.d2h-file-tree-file) {
+  min-height: 30px;
+  padding: 4px 12px 4px calc(14px + (var(--tree-depth, 0) * 18px));
+  border-top: 1px solid var(--diff-border);
+  color: var(--diff-line-muted) !important;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  line-height: 1.35;
+}
+.diff-content :deep(.d2h-file-tree > .d2h-file-tree-dir:first-child > .d2h-file-tree-dir-row),
+.diff-content :deep(.d2h-file-tree > .d2h-file-tree-file:first-child) {
+  border-top: 0;
+}
+.diff-content :deep(.d2h-file-tree-dir-row) {
+  list-style: none;
+  cursor: pointer;
+  user-select: none;
+}
+.diff-content :deep(.d2h-file-tree-dir-row::-webkit-details-marker) {
+  display: none;
+}
+.diff-content :deep(.d2h-file-tree-dir-row::before) {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border: solid currentColor;
+  border-width: 0 2px 2px 0;
+  transform: translateY(-1px) rotate(45deg);
+  transition: transform 0.14s ease;
+  flex: 0 0 auto;
+}
+.diff-content :deep(.d2h-file-tree-dir:not([open]) > .d2h-file-tree-dir-row::before) {
+  transform: translateX(1px) rotate(-45deg);
+}
+.diff-content :deep(.d2h-file-tree-file::before) {
+  content: "";
+  width: 8px;
+  height: 8px;
+  border: 1px solid currentColor;
+  border-radius: 2px;
+  background: var(--diff-toggle-bg);
+  color: var(--yellow);
+  flex: 0 0 auto;
+}
+.diff-content :deep(.d2h-file-tree-dir-row:hover),
+.diff-content :deep(.d2h-file-tree-file:hover) {
+  background: var(--diff-line-hover);
+  color: var(--diff-line) !important;
+}
+.diff-content :deep(.d2h-file-tree-file) {
+  text-decoration: none;
+}
+.diff-content :deep(.d2h-file-tree-file:focus-visible),
+.diff-content :deep(.d2h-file-tree-dir-row:focus-visible) {
+  outline: none;
+  box-shadow: inset 3px 0 0 var(--accent), 0 0 0 3px var(--accent-bg);
+}
+.diff-content :deep(.d2h-file-tree-dir-name),
+.diff-content :deep(.d2h-file-tree-file-name) {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.diff-content :deep(.d2h-file-tree-dir-name) {
+  color: var(--diff-strong);
+  font-weight: 700;
+}
+.diff-content :deep(.d2h-file-tree-count) {
+  color: var(--text3);
+  font-family: var(--font-ui);
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.diff-content :deep(.d2h-file-tree-stats) {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+.diff-content :deep(.d2h-file-tree-stats .d2h-lines-added),
+.diff-content :deep(.d2h-file-tree-stats .d2h-lines-deleted) {
+  min-width: 28px;
+  padding: 3px 7px !important;
+  border-radius: 5px !important;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
+  text-align: center;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.04);
+}
+.diff-content :deep(.d2h-file-tree-stats .d2h-lines-added) {
+  background: var(--diff-add-bg);
+  border-color: var(--accent-border) !important;
+  color: var(--diff-add-text) !important;
+}
+.diff-content :deep(.d2h-file-tree-stats .d2h-lines-deleted) {
+  background: var(--diff-del-bg);
+  border-color: color-mix(in srgb, var(--diff-del) 34%, transparent) !important;
+  color: var(--diff-del-text) !important;
+  margin-left: 0 !important;
+}
+@media (max-width: 980px) {
+  .diff-content.tree-split {
+    display: block;
+    overflow: auto;
+  }
+
+  .diff-tree-pane,
+  .diff-body-pane {
+    flex-basis: auto !important;
+    height: auto;
+    overflow: visible;
+  }
+
+  .diff-tree-resize-handle {
+    display: none;
+  }
+
+  .diff-tree-pane {
+    margin-bottom: 12px;
+  }
 }
 .diff-content :deep(.d2h-file-wrapper) {
   background: var(--diff-bg) !important;
@@ -1963,6 +2723,8 @@ onBeforeUnmount(() => {
   border-radius: 7px;
   overflow: auto;
   margin: 0 0 12px !important;
+  min-width: 0;
+  width: 100%;
   max-width: 100%;
 }
 .diff-content :deep(.d2h-file-header) {
@@ -2002,9 +2764,9 @@ onBeforeUnmount(() => {
   width: 24px;
   height: 24px;
   padding: 0;
-  border: 1px solid #343434;
+  border: 1px solid var(--diff-border);
   border-radius: 5px;
-  background: #202020;
+  background: var(--diff-toggle-bg);
   color: var(--diff-line-muted);
   cursor: pointer;
   flex-shrink: 0;
@@ -2024,7 +2786,7 @@ onBeforeUnmount(() => {
   transition: transform 0.16s ease;
 }
 .diff-content :deep(.d2h-file-toggle:hover) {
-  background: #2B2B2B;
+  background: var(--diff-toggle-hover);
   border-color: var(--accent-border);
   color: var(--diff-line);
 }
@@ -2077,9 +2839,9 @@ onBeforeUnmount(() => {
   min-width: 88px !important;
   max-width: 88px !important;
   padding: 0 20px 0 6px !important;
-  background: #151515 !important;
+  background: var(--diff-line-bg) !important;
   border-color: var(--diff-border) !important;
-  color: #7B8188 !important;
+  color: var(--diff-line-number) !important;
   font-size: 0 !important;
   line-height: 18px !important;
   text-align: right !important;
@@ -2122,7 +2884,7 @@ onBeforeUnmount(() => {
   line-height: 18px !important;
   white-space: pre !important;
 }
-.diff-content :deep(.d2h-code-line-prefix) { color: #6C7279 !important; }
+.diff-content :deep(.d2h-code-line-prefix) { color: var(--diff-code-prefix) !important; }
 
 .diff-content :deep(.d2h-cntx),
 .diff-content :deep(.d2h-cntx .d2h-code-line),
@@ -2131,28 +2893,28 @@ onBeforeUnmount(() => {
   color: var(--diff-line) !important;
 }
 .diff-content :deep(.d2h-cntx:hover) {
-  background: #161616 !important;
+  background: var(--diff-line-hover) !important;
 }
 .diff-content :deep(.d2h-ins) { background: var(--diff-add-bg) !important; }
 .diff-content :deep(.d2h-ins .d2h-code-line),
 .diff-content :deep(.d2h-ins .d2h-code-line-ctn) {
   background: transparent !important;
-  color: #BDFAD3 !important;
+  color: var(--diff-add-line) !important;
 }
 .diff-content :deep(.d2h-ins .d2h-code-linenumber) {
-  background: rgba(34,197,94,0.20) !important;
-  color: #43E17C !important;
+  background: var(--diff-add-bg2) !important;
+  color: var(--diff-add-text) !important;
   box-shadow: inset 3px 0 0 var(--diff-add);
 }
 .diff-content :deep(.d2h-del) { background: var(--diff-del-bg) !important; }
 .diff-content :deep(.d2h-del .d2h-code-line),
 .diff-content :deep(.d2h-del .d2h-code-line-ctn) {
   background: transparent !important;
-  color: #FFD1CD !important;
+  color: var(--diff-del-line) !important;
 }
 .diff-content :deep(.d2h-del .d2h-code-linenumber) {
-  background: rgba(241,93,82,0.18) !important;
-  color: #FF746B !important;
+  background: var(--diff-del-bg2) !important;
+  color: var(--diff-del-text) !important;
   box-shadow: inset 3px 0 0 var(--diff-del);
 }
 .diff-content :deep(.d2h-info) {
@@ -2163,7 +2925,7 @@ onBeforeUnmount(() => {
 .diff-content :deep(.d2h-info .d2h-code-line-ctn),
 .diff-content :deep(.d2h-info .d2h-code-linenumber) {
   background: transparent !important;
-  color: #A0A6AD !important;
+  color: var(--diff-line-muted) !important;
 }
 .diff-content :deep(.d2h-code-line ins) {
   background-color: var(--diff-add-bg2) !important;
@@ -2266,13 +3028,13 @@ onBeforeUnmount(() => {
 }
 
 /* ── Syntax highlighting ── */
-.diff-content :deep(.syn-keyword)     { color: #FF8A5C; font-weight: 700; }
-.diff-content :deep(.syn-type)        { color: #9CDCFE; }
-.diff-content :deep(.syn-annotation)  { color: #DDB94F; font-weight: 700; }
-.diff-content :deep(.syn-string)      { color: #B8E986; }
-.diff-content :deep(.syn-number)      { color: #C792EA; }
-.diff-content :deep(.syn-literal)     { color: #7DD3FC; font-weight: 700; }
-.diff-content :deep(.syn-property)    { color: #7DD3FC; font-weight: 700; }
-.diff-content :deep(.syn-punctuation) { color: #A0A6AD; }
-.diff-content :deep(.syn-comment)     { color: #6A9955; font-style: italic; }
+.diff-content :deep(.syn-keyword)     { color: var(--syn-keyword); font-weight: 700; }
+.diff-content :deep(.syn-type)        { color: var(--syn-type); }
+.diff-content :deep(.syn-annotation)  { color: var(--syn-annotation); font-weight: 700; }
+.diff-content :deep(.syn-string)      { color: var(--syn-string); }
+.diff-content :deep(.syn-number)      { color: var(--syn-number); }
+.diff-content :deep(.syn-literal)     { color: var(--syn-literal); font-weight: 700; }
+.diff-content :deep(.syn-property)    { color: var(--syn-property); font-weight: 700; }
+.diff-content :deep(.syn-punctuation) { color: var(--syn-punctuation); }
+.diff-content :deep(.syn-comment)     { color: var(--syn-comment); font-style: italic; }
 </style>

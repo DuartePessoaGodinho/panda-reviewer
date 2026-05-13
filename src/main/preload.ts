@@ -30,6 +30,7 @@ contextBridge.exposeInMainWorld('api', {
   pickFile: (filters?: { name: string; extensions: string[] }[]) => ipcRenderer.invoke('pick-file', filters),
   closeWindow: () => ipcRenderer.invoke('close-window'),
   minimizeWindow: () => ipcRenderer.invoke('minimize-window'),
+  setThemeBackground: (theme: 'light' | 'dark') => ipcRenderer.invoke('set-theme-background', theme),
   openSettings: () => ipcRenderer.invoke('open-settings'),
   forcePoll: () => ipcRenderer.invoke('force-poll'),
   checkClaudeCli: () => ipcRenderer.invoke('check-claude-cli'),

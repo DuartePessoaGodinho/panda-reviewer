@@ -8,11 +8,6 @@
       'card-pipeline-fail': pipelineStatus === 'failed',
       'card-pipeline-run': pipelineStatus === 'running' || pipelineStatus === 'pending',
     }"
-    v-motion
-    :initial="{ opacity: 0, y: 14 }"
-    :enter="{ opacity: draft ? 0.75 : 1, y: 0, transition: { type: 'spring', stiffness: 320, damping: 28, delay: index * 48 } }"
-    :hovered="{ y: -2, transition: { duration: 120 } }"
-    :tapped="{ scale: 0.985, y: 0, transition: { duration: 80 } }"
     role="button"
     tabindex="0"
     :aria-label="`View diff for ${title}`"
@@ -121,7 +116,6 @@ import { isDraft, displayTitle, projectName, timeAgo } from '../utils';
 
 const props = defineProps<{
   mr: MR;
-  index: number;
   isActive: boolean;
   approved: boolean;
   pinned: boolean;
@@ -194,8 +188,14 @@ const aiDisabledTitle = computed(() => {
   position: relative;
   min-width: 0;
   overflow: hidden;
-  will-change: transform;
 }
+
+:global(:root[data-theme="dark"]) .mr-card {
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+  border-left-width: 0;
+}
+
 .mr-card::before {
   content: '';
   position: absolute;
@@ -203,6 +203,19 @@ const aiDisabledTitle = computed(() => {
   border-radius: inherit;
   background: linear-gradient(180deg, rgba(255,255,255,0.015) 0%, transparent 50%);
   pointer-events: none;
+}
+.mr-card::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 52px;
+  border-radius: 0 0 var(--radius-md) var(--radius-md);
+  background: linear-gradient(180deg, transparent 0%, var(--surface2) 48%);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--dur-base);
 }
 .mr-card:hover {
   background: var(--surface2);
@@ -254,6 +267,10 @@ const aiDisabledTitle = computed(() => {
 .mr-card:hover .avatar {
   border-color: var(--border2);
   box-shadow: 0 0 0 2px var(--accent-bg);
+}
+.mr-card:hover::after,
+.mr-card:focus-within::after {
+  opacity: 1;
 }
 
 .mr-meta { flex: 1; min-width: 0; }
@@ -347,23 +364,36 @@ const aiDisabledTitle = computed(() => {
 
 /* Action buttons */
 .card-actions {
+  position: absolute;
+  left: 14px;
+  right: 14px;
+  bottom: 10px;
+  z-index: 2;
   display: grid;
   grid-template-columns: minmax(0, 1fr) 33px 33px 33px;
   gap: 5px;
-  margin-top: 10px;
-  padding-top: 10px;
-  border-top: 1px solid var(--border);
   opacity: 0;
-  transform: translateY(3px);
-  transition: opacity var(--dur-base), transform var(--dur-base) var(--ease-out);
+  visibility: hidden;
+  pointer-events: none;
+  transform: translateY(4px);
+  transition:
+    opacity var(--dur-base),
+    transform var(--dur-base) var(--ease-out),
+    visibility 0s linear var(--dur-base);
 }
 .card-actions.has-approve {
   grid-template-columns: minmax(0, 1fr) 33px 33px minmax(92px, 0.8fr) 33px;
 }
 .mr-card:hover .card-actions,
-.mr-card.active .card-actions {
+.mr-card:focus-within .card-actions {
   opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
   transform: translateY(0);
+  transition:
+    opacity var(--dur-base),
+    transform var(--dur-base) var(--ease-out),
+    visibility 0s;
 }
 
 .pin-btn {

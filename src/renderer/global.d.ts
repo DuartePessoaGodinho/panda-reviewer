@@ -28,6 +28,7 @@ interface ElectronAPI {
   pickFile: (filters?: { name: string; extensions: string[] }[]) => Promise<string | null>;
   closeWindow: () => void;
   minimizeWindow: () => void;
+  setThemeBackground: (theme: 'light' | 'dark') => Promise<void>;
   openSettings: () => Promise<void>;
   forcePoll: () => Promise<void>;
   checkClaudeCli: () => Promise<{ available: boolean; version?: string }>;

@@ -70,16 +70,16 @@ function onRun() {
   outline: none; font-family: inherit; line-height: 1.5;
   transition: border-color 0.15s, box-shadow 0.15s; user-select: text;
 }
-.ai-context-textarea:focus { border-color: #7c3aed; box-shadow: 0 0 0 3px rgba(124,58,237,0.12); }
+.ai-context-textarea:focus { border-color: var(--accent-border); box-shadow: 0 0 0 3px var(--accent-bg); }
 .ai-context-textarea::placeholder { color: var(--text3); }
 
 .ai-run-btn {
   height: 34px; padding: 0 16px;
-  background: linear-gradient(135deg, #4c1d95 0%, #5b21b6 100%);
-  border: 1px solid #7c3aed; color: #e9d5ff;
+  background: var(--button-primary-bg);
+  border: 1px solid var(--button-primary-border); color: var(--button-primary-text);
   border-radius: 7px; font-size: 13px; font-weight: 700; cursor: pointer;
   transition: background 0.15s, box-shadow 0.15s; flex-shrink: 0;
 }
-.ai-run-btn:hover { background: linear-gradient(135deg, #5b21b6 0%, #6d28d9 100%); box-shadow: 0 2px 12px rgba(124,58,237,0.3); }
+.ai-run-btn:hover { background: var(--button-primary-bg-hover); box-shadow: 0 2px 12px var(--accent-glow); }
 .ai-run-btn:disabled { opacity: 0.45; cursor: not-allowed; pointer-events: none; }
 </style>

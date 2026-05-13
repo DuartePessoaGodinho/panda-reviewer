@@ -138,7 +138,7 @@ function onNotesInput() {
 .ai-output-area :deep(h3) { font-size: 15px; color: var(--text2); }
 .ai-output-area :deep(p)  { font-size: 14px; line-height: 1.6; color: var(--text2); margin-bottom: 10px; }
 .ai-output-area :deep(strong) { color: var(--text); }
-.ai-output-area :deep(code) { font-family: 'Cascadia Code','Fira Code',monospace; font-size: 12px; background: var(--surface2); border: 1px solid var(--border); border-radius: 4px; padding: 1px 5px; color: #58a6ff; }
+.ai-output-area :deep(code) { font-family: 'Cascadia Code','Fira Code',monospace; font-size: 12px; background: var(--surface2); border: 1px solid var(--border); border-radius: 4px; padding: 1px 5px; color: var(--code-accent); }
 .ai-output-area :deep(pre) { background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; padding: 12px; overflow-x: auto; margin-bottom: 12px; }
 .ai-output-area :deep(pre code) { background: none; border: none; padding: 0; font-size: 13px; color: var(--text); }
 .ai-output-area :deep(ul), .ai-output-area :deep(ol) { padding-left: 20px; margin-bottom: 10px; }

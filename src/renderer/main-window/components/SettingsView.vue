@@ -313,7 +313,7 @@ async function onSave() {
   gap: 6px; transition: background 0.1s, border-color 0.1s, color 0.1s;
 }
 .option-btn:hover    { background: var(--surface2); color: var(--text); }
-.option-btn.selected { background: var(--accent-bg); border-color: var(--accent-border); color: #58a6ff; font-weight: 700; }
+.option-btn.selected { background: var(--accent-bg); border-color: var(--accent-border); color: var(--accent); font-weight: 700; }
 .option-icon { font-size: 15px; }
 
 /* Toggle switch */
@@ -348,10 +348,10 @@ async function onSave() {
 .btn-save {
   padding: 7px 20px; border-radius: 6px;
   border: 1px solid var(--accent-border);
-  background: var(--accent-bg); color: #58a6ff;
+  background: var(--accent-bg); color: var(--accent);
   font-size: 14px; font-weight: 600; cursor: pointer; min-width: 80px;
   transition: background 0.12s;
 }
-.btn-save:hover  { background: #1f3a5a; }
+.btn-save:hover  { background: var(--accent-dim); }
 .btn-save.saved  { background: rgba(63,185,80,0.15); border-color: var(--green); color: var(--green); }
 </style>

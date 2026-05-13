@@ -544,7 +544,7 @@ watch(
   outline: none;
   transition: border-color 0.14s, box-shadow 0.14s, background 0.14s;
 }
-.comment-search:focus { border-color: var(--accent-border); box-shadow: 0 0 0 3px var(--accent-bg); background: #0d0c0b; }
+.comment-search:focus { border-color: var(--accent-border); box-shadow: 0 0 0 3px var(--accent-bg); background: var(--input-focus-bg); }
 .comment-search::placeholder { color: var(--text3); }
 
 .comments-scroll {
@@ -615,7 +615,7 @@ watch(
 }
 
 .comment-textarea:focus,
-.reply-textarea:focus { border-color: var(--accent-border); box-shadow: 0 0 0 3px var(--accent-bg); background: #0d0c0b; }
+.reply-textarea:focus { border-color: var(--accent-border); box-shadow: 0 0 0 3px var(--accent-bg); background: var(--input-focus-bg); }
 .comment-textarea::placeholder,
 .reply-textarea::placeholder { color: var(--text3); }
 
@@ -920,7 +920,7 @@ watch(
   max-height: 260px;
   border: 1px solid var(--accent-border);
   border-radius: 7px;
-  background: #0d0c0b;
+  background: var(--input-focus-bg);
   color: var(--text);
   font-family: var(--font-ui);
   font-size: 13px;

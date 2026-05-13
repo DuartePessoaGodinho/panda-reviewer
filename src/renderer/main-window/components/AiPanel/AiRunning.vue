@@ -65,7 +65,7 @@ defineEmits<{ cancel: [] }>();
   padding: 10px 16px; border-bottom: 1px solid var(--border); flex-shrink: 0;
 }
 .ai-status-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
-.ai-status-dot.running { background: #7c3aed; animation: pulse 0.8s ease-in-out infinite; }
+.ai-status-dot.running { background: var(--accent); animation: pulse 0.8s ease-in-out infinite; }
 .ai-cancel-btn {
   padding: 3px 10px; border: 1px solid var(--border2);
   background: transparent; color: var(--text2); border-radius: 5px;

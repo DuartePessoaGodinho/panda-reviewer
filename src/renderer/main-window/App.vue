@@ -14,6 +14,25 @@
           <span class="poll-text">{{ pollText }}</span>
         </div>
         <span class="last-updated" v-if="lastUpdated">{{ lastUpdated }}</span>
+        <button
+          class="theme-toggle"
+          type="button"
+          :title="theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'"
+          :aria-label="theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'"
+          :aria-pressed="theme === 'dark'"
+          @click="toggleTheme"
+        >
+          <span class="theme-toggle-track">
+            <span class="theme-toggle-thumb">
+              <svg v-if="theme === 'dark'" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+                <path d="M9.6 14.7A6.7 6.7 0 0 1 8.2 1.4a.55.55 0 0 1 .54.86 5 5 0 0 0 5 7.78.55.55 0 0 1 .72.68A6.72 6.72 0 0 1 9.6 14.7Z"/>
+              </svg>
+              <svg v-else viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+                <path d="M8 11.25A3.25 3.25 0 1 0 8 4.75a3.25 3.25 0 0 0 0 6.5ZM8 .75a.75.75 0 0 1 .75.75v1a.75.75 0 0 1-1.5 0v-1A.75.75 0 0 1 8 .75Zm0 12a.75.75 0 0 1 .75.75v1a.75.75 0 0 1-1.5 0v-1a.75.75 0 0 1 .75-.75ZM14.5 7.25a.75.75 0 0 1 0 1.5h-1a.75.75 0 0 1 0-1.5h1Zm-12 0a.75.75 0 0 1 0 1.5h-1a.75.75 0 0 1 0-1.5h1Zm10.2-4.98a.75.75 0 0 1 1.06 1.06l-.7.7A.75.75 0 0 1 12 2.97l.7-.7ZM3.03 12a.75.75 0 0 1 1.06 1.06l-.7.7a.75.75 0 1 1-1.06-1.06l.7-.7Zm10.73.7a.75.75 0 0 1-1.06 1.06l-.7-.7A.75.75 0 1 1 13.06 12l.7.7ZM4.09 2.97A.75.75 0 1 1 3.03 4.03l-.7-.7a.75.75 0 1 1 1.06-1.06l.7.7Z"/>
+              </svg>
+            </span>
+          </span>
+        </button>
         <button class="titlebar-btn" :class="{ spinning: refreshing }" title="Refresh" @click="onRefresh">
           <svg viewBox="0 0 16 16" fill="currentColor">
             <path d="M8 3a5 5 0 1 0 4.546 2.914.5.5 0 0 1 .908-.417A6 6 0 1 1 8 2v1z"/>
@@ -117,11 +136,11 @@ const pollText        = ref('Connecting…');
 const refreshing      = ref(false);
 const cloneUrl        = ref('');
 const cloneCopied     = ref(false);
+const theme           = ref<'light' | 'dark'>(loadTheme());
 
 interface Toast { id: number; msg: string; type: 'ok' | 'err' | 'info'; out: boolean }
 const toasts = ref<Toast[]>([]);
 let toastSeq = 0;
-let mrOpenSeq = 0;
 
 const providerLabel = computed(() => {
   if (aiProvider.value === 'copilot') return 'Copilot';
@@ -145,6 +164,24 @@ function setPollStatus(state: typeof pollState.value, text: string) {
 function minimizeWindow() { window.api.minimizeWindow(); }
 function closeWindow()    { window.api.closeWindow(); }
 
+function loadTheme(): 'light' | 'dark' {
+  const saved = localStorage.getItem('panda-theme');
+  return saved === 'dark' ? 'dark' : 'light';
+}
+
+function applyTheme(nextTheme: typeof theme.value) {
+  document.documentElement.dataset.theme = nextTheme;
+  void window.api?.setThemeBackground?.(nextTheme);
+}
+
+function toggleTheme() {
+  theme.value = theme.value === 'dark' ? 'light' : 'dark';
+  localStorage.setItem('panda-theme', theme.value);
+  applyTheme(theme.value);
+}
+
+applyTheme(theme.value);
+
 async function onRefresh() {
   refreshing.value = true;
   setPollStatus('loading', 'Refreshing…');
@@ -152,23 +189,12 @@ async function onRefresh() {
   setTimeout(() => { refreshing.value = false; }, 2000);
 }
 
-async function onMrOpen(mr: MR) {
-  const seq = ++mrOpenSeq;
+function onMrOpen(mr: MR) {
   const isRunningReview = ai.running && ai.reviewingMr?.id === mr.id;
 
   mrs.setActiveMr(mr);
   mrs.setActivePanelTab(isRunningReview ? 'ai' : 'diff');
   mrs.setAiDrawerOpen(isRunningReview);
-
-  if (isRunningReview) return;
-
-  const history = await window.api.getReviewHistory(mr.id);
-  if (seq !== mrOpenSeq || mrs.activeMr?.id !== mr.id) return;
-
-  if (history.length > 0) {
-    mrs.setActivePanelTab('ai');
-    mrs.setAiDrawerOpen(true);
-  }
 }
 
 function onAiReview(mr: MR) {
@@ -195,6 +221,8 @@ async function prefetchRepoPaths(mrsArr: MR[]) {
 }
 
 onMounted(async () => {
+  applyTheme(theme.value);
+
   const settings = await window.api.getSettings();
   aiEnabled.value  = settings.aiReviewEnabled ?? true;
   aiProvider.value = settings.aiReviewProvider ?? 'claude';
@@ -234,9 +262,9 @@ onMounted(async () => {
     await window.api.saveReviewEntry(mr.id, entry);
     if (mrs.activeMr?.id === mr.id) {
       mrs.setAiDrawerOpen(true);
-      mrs.setActivePanelTab('ai');
+      mrs.setActivePanelTab('diff');
     }
-    if (mrs.activeMr?.id !== mr.id || mrs.activePanelTab !== 'ai') {
+    if (mrs.activeMr?.id !== mr.id || !mrs.aiDrawerOpen) {
       showToast(`✦ AI Review complete: ${mr.title.slice(0, 45)}${mr.title.length > 45 ? '…' : ''}`, 'ok', 6000);
     }
   });
@@ -250,9 +278,14 @@ onMounted(async () => {
 
 <style scoped>
 .app-root {
+  position: fixed;
+  inset: 0;
   display: flex;
   flex-direction: column;
-  height: 100vh;
+  width: auto;
+  height: auto;
+  min-width: 0;
+  background: var(--window-bg);
   overflow: hidden;
 }
 
@@ -263,11 +296,12 @@ onMounted(async () => {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 10px 0 14px;
+  padding: 0 18px 0 14px;
   -webkit-app-region: drag;
   border-bottom: 1px solid var(--border);
   flex-shrink: 0;
   position: relative;
+  min-width: 0;
 }
 .titlebar::after {
   content: '';
@@ -284,6 +318,7 @@ onMounted(async () => {
   display: flex;
   align-items: center;
   gap: 9px;
+  min-width: 0;
 }
 
 .app-mark {
@@ -308,6 +343,9 @@ onMounted(async () => {
   font-weight: 600;
   color: var(--text2);
   letter-spacing: -0.02em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .titlebar-actions {
@@ -315,6 +353,8 @@ onMounted(async () => {
   align-items: center;
   gap: 4px;
   -webkit-app-region: no-drag;
+  min-width: 0;
+  flex-shrink: 0;
 }
 
 .last-updated {
@@ -342,6 +382,65 @@ onMounted(async () => {
 .titlebar-btn.active { background: var(--surface3); color: var(--text); }
 .titlebar-btn svg { width: 13px; height: 13px; pointer-events: none; }
 .titlebar-btn.spinning svg { animation: spin 0.75s linear infinite; }
+
+.theme-toggle {
+  width: 45px;
+  height: 27px;
+  border: 0;
+  background: transparent;
+  color: var(--text2);
+  cursor: pointer;
+  border-radius: 999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  transition: transform var(--dur-fast) var(--ease-spring);
+}
+.theme-toggle:hover { transform: translateY(-1px); }
+.theme-toggle:active { transform: scale(0.96); }
+.theme-toggle:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.theme-toggle-track {
+  width: 39px;
+  height: 21px;
+  border-radius: 999px;
+  border: 1px solid var(--border2);
+  background: var(--surface3);
+  display: flex;
+  align-items: center;
+  padding: 2px;
+  box-shadow: inset 0 1px 2px rgba(0,0,0,0.08);
+  transition: background var(--dur-base), border-color var(--dur-base);
+}
+.theme-toggle-thumb {
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  background: var(--surface);
+  color: var(--accent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: var(--shadow-sm);
+  transform: translateX(0);
+  transition: transform var(--dur-base) var(--ease-spring), background var(--dur-base), color var(--dur-base);
+}
+:global(:root[data-theme="dark"]) .theme-toggle-track {
+  background: var(--accent-bg);
+  border-color: var(--accent-border);
+}
+:global(:root[data-theme="dark"]) .theme-toggle-thumb {
+  background: var(--surface);
+  color: var(--accent);
+}
+.theme-toggle-thumb svg {
+  width: 10px;
+  height: 10px;
+  pointer-events: none;
+}
 
 .poll-status {
   display: flex;
@@ -385,6 +484,7 @@ onMounted(async () => {
   margin-left: 4px;
   padding-left: 8px;
   border-left: 1px solid var(--border);
+  flex-shrink: 0;
 }
 
 .win-btn {
@@ -406,7 +506,7 @@ onMounted(async () => {
 .win-btn svg { width: 11px; height: 11px; pointer-events: none; }
 
 /* ── Layout ── */
-.layout { display: flex; flex: 1; overflow: hidden; min-height: 0; }
+.layout { display: flex; flex: 1; overflow: hidden; min-height: 0; background: var(--bg); }
 .panel  { display: flex; flex: 1; overflow: hidden; min-height: 0; }
 .split  { display: flex; flex: 1; overflow: hidden; min-height: 0; }
 

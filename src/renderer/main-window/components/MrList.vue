@@ -38,10 +38,9 @@
           <!-- Cards -->
           <MrCard
             v-else
-            v-for="(mr, i) in filters.filteredMrs"
+            v-for="mr in filters.filteredMrs"
             :key="mr.id"
             :mr="mr"
-            :index="i"
             :is-active="mrs.activeMr?.id === mr.id"
             :approved="mrs.approvedByMe(mr)"
             :pinned="mrs.isPinned(mr)"
@@ -168,6 +167,7 @@ defineExpose({ clearLoading: () => { loading.value = false; } });
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
+  background: var(--surface);
   border-right: 1px solid var(--border);
   overflow: hidden;
 }
@@ -255,6 +255,7 @@ defineExpose({ clearLoading: () => { loading.value = false; } });
   scrollbar-gutter: stable;
   padding: 10px;
   position: relative;
+  background: var(--surface);
 }
 
 .mr-list-inner {
