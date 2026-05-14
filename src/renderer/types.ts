@@ -87,7 +87,9 @@ export interface MR {
   work_in_progress: boolean;
   user_notes_count: number;
   author: { id: number; name: string; username: string; avatar_url: string };
-  approved_by: { user: { id: number } }[];
+  approved_by: { user: { id: number; name?: string; username?: string; avatar_url?: string } }[];
+  approvals_required?: number;
+  approvals_left?: number;
   head_pipeline: { status: string } | null;
   references: { full: string } | null;
   sha?: string;
@@ -96,7 +98,14 @@ export interface MR {
   review_activity_kind?: 'commit' | 'author_comment' | 'created';
 }
 
-export type MrActivityKind = 'new_mr' | 'new_commit' | 'author_comment' | 'updated';
+export type MrActivityKind =
+  | 'new_mr'
+  | 'new_commit'
+  | 'author_comment'
+  | 'updated'
+  | 'approved'
+  | 'fully_approved'
+  | 'approval_removed';
 
 export interface MrActivityEvent {
   mrId: number;

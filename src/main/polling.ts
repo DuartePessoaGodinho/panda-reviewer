@@ -3,8 +3,19 @@ import { GitLabService, MergeRequest } from './gitlab';
 import { getSettings } from './settings';
 import { buildRepoCache } from './localRepo';
 
-type SnapshotMap = Map<number, string>; // mr.id -> review activity key
-export type MrActivityKind = 'new_mr' | 'new_commit' | 'author_comment' | 'updated';
+interface MrSnapshot {
+  activityKey: string;
+  approvalSig: string;
+}
+type SnapshotMap = Map<number, MrSnapshot>; // mr.id -> { activityKey, approvalSig }
+export type MrActivityKind =
+  | 'new_mr'
+  | 'new_commit'
+  | 'author_comment'
+  | 'updated'
+  | 'approved'
+  | 'fully_approved'
+  | 'approval_removed';
 
 export interface MrActivityEvent {
   mrId: number;
@@ -46,16 +57,36 @@ function truncateNotificationText(text: string, maxLength = 80): string {
   return trimmed.length > maxLength ? `${trimmed.slice(0, maxLength - 1)}…` : trimmed;
 }
 
-function notifyMrChange(kind: 'New MR' | 'MR Updated', label: string, mr: MergeRequest): void {
+type NotificationKind = 'New MR' | 'MR Updated' | 'MR Approved' | 'MR Ready to Merge' | 'Approval Removed';
+
+function notifyMrChange(kind: NotificationKind, label: string, mr: MergeRequest, detail?: string): void {
   const mrTitle = truncateNotificationText(mr.title);
   const reference = mr.references?.full ?? `!${mr.iid}`;
   const author = mr.author?.name ? ` by ${mr.author.name}` : '';
+  const tail = detail ? ` — ${detail}` : '';
 
-  notify(`${kind}: ${mrTitle}`, `${label} - ${reference}${author}`);
+  notify(`${kind}: ${mrTitle}`, `${label} - ${reference}${author}${tail}`);
 }
 
 function reviewActivityKey(mr: MergeRequest): string {
   return mr.review_activity_key ?? (mr.sha ? `commit:${mr.sha}` : `created:${mr.id}:${mr.created_at}`);
+}
+
+function approverIds(mr: MergeRequest): number[] {
+  return (mr.approved_by ?? [])
+    .map(a => a.user?.id)
+    .filter((id): id is number => typeof id === 'number')
+    .sort((a, b) => a - b);
+}
+
+function approvalSig(mr: MergeRequest): string {
+  const left = typeof mr.approvals_left === 'number' ? mr.approvals_left : -1;
+  const required = typeof mr.approvals_required === 'number' ? mr.approvals_required : -1;
+  return `${required}:${left}:${approverIds(mr).join(',')}`;
+}
+
+function snapshotOf(mr: MergeRequest): MrSnapshot {
+  return { activityKey: reviewActivityKey(mr), approvalSig: approvalSig(mr) };
 }
 
 function classifyActivity(mr: MergeRequest, isNew: boolean): MrActivityKind {
@@ -63,6 +94,27 @@ function classifyActivity(mr: MergeRequest, isNew: boolean): MrActivityKind {
   if (mr.review_activity_kind === 'commit') return 'new_commit';
   if (mr.review_activity_kind === 'author_comment') return 'author_comment';
   return 'updated';
+}
+
+interface ApprovalDelta {
+  added: number[];   // approver IDs newly added
+  removed: number[]; // approver IDs newly removed
+  prevLeft: number | null;
+  nextLeft: number | null;
+}
+
+function diffApprovals(prevSig: string | undefined, mr: MergeRequest): ApprovalDelta | null {
+  if (prevSig === undefined) return null;
+  const [, prevLeftRaw, prevIdsRaw] = prevSig.split(':');
+  const prevIds = prevIdsRaw ? prevIdsRaw.split(',').map(Number).filter(Number.isFinite) : [];
+  const nextIds = approverIds(mr);
+  const prevSet = new Set(prevIds);
+  const nextSet = new Set(nextIds);
+  const added = nextIds.filter(id => !prevSet.has(id));
+  const removed = prevIds.filter(id => !nextSet.has(id));
+  const prevLeft = prevLeftRaw === '-1' ? null : Number(prevLeftRaw);
+  const nextLeft = typeof mr.approvals_left === 'number' ? mr.approvals_left : null;
+  return { added, removed, prevLeft, nextLeft };
 }
 
 function commitShaFromActivityKey(key: string | undefined): string | undefined {
@@ -91,6 +143,22 @@ function buildActivityEvent(
   };
 }
 
+function approverDisplayName(mr: MergeRequest, userId: number): string {
+  const u = (mr.approved_by ?? []).find(a => a.user?.id === userId)?.user;
+  return u?.name || u?.username || `user ${userId}`;
+}
+
+function buildApprovalEvent(
+  mr: MergeRequest,
+  label: 'To Review' | 'My MRs',
+  prevActivityKey: string,
+  nextActivityKey: string,
+  kind: 'approved' | 'fully_approved' | 'approval_removed'
+): MrActivityEvent {
+  const base = buildActivityEvent(mr, label, prevActivityKey, nextActivityKey, false);
+  return { ...base, kind };
+}
+
 function detectChanges(
   prev: SnapshotMap,
   next: MergeRequest[],
@@ -98,14 +166,59 @@ function detectChanges(
 ): MrActivityEvent[] {
   const events: MrActivityEvent[] = [];
   for (const mr of next) {
-    const prevActivity = prev.get(mr.id);
+    const prevSnap = prev.get(mr.id);
     const nextActivity = reviewActivityKey(mr);
-    if (!prevActivity) {
+
+    if (!prevSnap) {
       notifyMrChange('New MR', label, mr);
-      events.push(buildActivityEvent(mr, label, prevActivity, nextActivity, true));
-    } else if (prevActivity !== nextActivity) {
+      events.push(buildActivityEvent(mr, label, undefined, nextActivity, true));
+      continue;
+    }
+
+    if (prevSnap.activityKey !== nextActivity) {
+      // Commit/comment activity dominates — approval signature often resets on new commits
+      // and a separate "approval removed" notification would just be noise.
       notifyMrChange('MR Updated', label, mr);
-      events.push(buildActivityEvent(mr, label, prevActivity, nextActivity, false));
+      events.push(buildActivityEvent(mr, label, prevSnap.activityKey, nextActivity, false));
+      continue;
+    }
+
+    const nextApprovalSig = approvalSig(mr);
+    if (prevSnap.approvalSig === nextApprovalSig) continue;
+
+    const delta = diffApprovals(prevSnap.approvalSig, mr);
+    if (!delta) continue;
+
+    // Suppress self-approval echo: if the only newly-added approver is the current user,
+    // they just clicked Approve in-app — no need to notify them about their own action.
+    const newApproversExcludingSelf = delta.added.filter(id => id !== currentUserId);
+    const removedExcludingSelf = delta.removed.filter(id => id !== currentUserId);
+
+    if (delta.added.length > 0 && newApproversExcludingSelf.length === 0 && removedExcludingSelf.length === 0) {
+      // Self-approve only. Still emit an in-app activity event so the badge reflects state,
+      // but skip the desktop notification.
+      events.push(buildApprovalEvent(mr, label, prevSnap.activityKey, nextActivity,
+        delta.nextLeft === 0 ? 'fully_approved' : 'approved'));
+      continue;
+    }
+
+    if (delta.added.length > 0) {
+      const becameFullyApproved = delta.prevLeft !== 0 && delta.nextLeft === 0;
+      const namesLabel = newApproversExcludingSelf.length > 0
+        ? newApproversExcludingSelf.map(id => approverDisplayName(mr, id)).join(', ')
+        : delta.added.map(id => approverDisplayName(mr, id)).join(', ');
+
+      if (becameFullyApproved) {
+        notifyMrChange('MR Ready to Merge', label, mr, `Approved by ${namesLabel}`);
+        events.push(buildApprovalEvent(mr, label, prevSnap.activityKey, nextActivity, 'fully_approved'));
+      } else {
+        notifyMrChange('MR Approved', label, mr, `Approved by ${namesLabel}`);
+        events.push(buildApprovalEvent(mr, label, prevSnap.activityKey, nextActivity, 'approved'));
+      }
+    } else if (delta.removed.length > 0) {
+      const namesLabel = delta.removed.map(id => approverDisplayName(mr, id)).join(', ');
+      notifyMrChange('Approval Removed', label, mr, `By ${namesLabel}`);
+      events.push(buildApprovalEvent(mr, label, prevSnap.activityKey, nextActivity, 'approval_removed'));
     }
   }
   return events;
@@ -139,8 +252,8 @@ async function poll(): Promise<void> {
         ];
     firstPoll = false;
 
-    reviewSnapshot = new Map(toReview.map(mr => [mr.id, reviewActivityKey(mr)]));
-    myMrsSnapshot = new Map(myMrs.map(mr => [mr.id, reviewActivityKey(mr)]));
+    reviewSnapshot = new Map(toReview.map(mr => [mr.id, snapshotOf(mr)]));
+    myMrsSnapshot = new Map(myMrs.map(mr => [mr.id, snapshotOf(mr)]));
 
     onUpdate?.(toReview, myMrs, activityEvents);
   } catch (err) {

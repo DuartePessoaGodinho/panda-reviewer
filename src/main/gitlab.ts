@@ -24,7 +24,9 @@ export interface MergeRequest {
   project_id: number;
   references: { full: string };
   head_pipeline?: { status: string };
-  approved_by: { user: { id: number } }[];
+  approved_by: { user: { id: number; name?: string; username?: string; avatar_url?: string } }[];
+  approvals_required?: number;
+  approvals_left?: number;
   user_notes_count: number;
   sha?: string;
   review_activity_at?: string;
@@ -33,7 +35,9 @@ export interface MergeRequest {
 }
 
 interface MergeRequestApprovals {
-  approved_by: { user: { id: number } }[];
+  approved_by: { user: { id: number; name?: string; username?: string; avatar_url?: string } }[];
+  approvals_required?: number;
+  approvals_left?: number;
 }
 
 interface MergeRequestCommit {
@@ -246,6 +250,8 @@ export class GitLabService {
   private async withReviewInfo(mrs: MergeRequest[]): Promise<MergeRequest[]> {
     return Promise.all(mrs.map(async (mr) => {
       let approved_by = mr.approved_by ?? [];
+      let approvals_required = mr.approvals_required;
+      let approvals_left = mr.approvals_left;
       let activity: Pick<MergeRequest, 'review_activity_at' | 'review_activity_key' | 'review_activity_kind'> = {
         review_activity_at: mr.created_at,
         review_activity_key: mr.sha ? `commit:${mr.sha}` : `created:${mr.id}:${mr.created_at}`,
@@ -257,6 +263,8 @@ export class GitLabService {
           `/projects/${mr.project_id}/merge_requests/${mr.iid}/approvals`
         );
         approved_by = approvals.approved_by ?? [];
+        approvals_required = approvals.approvals_required;
+        approvals_left = approvals.approvals_left;
       } catch (err) {
         console.warn(`Failed to fetch approvals for MR ${mr.project_id}!${mr.iid}:`, err);
       }
@@ -267,7 +275,7 @@ export class GitLabService {
         console.warn(`Failed to derive review activity for MR ${mr.project_id}!${mr.iid}:`, err);
       }
 
-      return { ...mr, approved_by, ...activity };
+      return { ...mr, approved_by, approvals_required, approvals_left, ...activity };
     }));
   }
 

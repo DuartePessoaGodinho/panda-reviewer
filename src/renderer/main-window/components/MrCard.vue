@@ -4,7 +4,7 @@
     :class="{
       active: isActive,
       draft: draft,
-      'card-approved': approved,
+      'card-approved': fullyApproved,
       'card-pipeline-fail': pipelineStatus === 'failed',
       'card-pipeline-run': pipelineStatus === 'running' || pipelineStatus === 'pending',
     }"
@@ -29,7 +29,15 @@
             <span v-if="pipelineStatus === 'success'" class="badge pipeline-ok">✓ CI</span>
             <span v-if="pipelineStatus === 'failed'"  class="badge pipeline-fail">✗ CI</span>
             <span v-if="pipelineStatus === 'running' || pipelineStatus === 'pending'" class="badge pipeline-run">⟳ CI</span>
-            <span v-if="approved" class="badge approved">✓ Approved</span>
+            <span
+              v-if="showApprovalBadge"
+              class="badge approval-status"
+              :class="{ approved: fullyApproved, partial: !fullyApproved, 'by-you': approved }"
+              :title="approvalTitle"
+            >
+              <span class="approval-icon">✓</span>
+              <span class="approval-count">{{ approvalLabel }}</span>
+            </span>
             <span v-if="pinned" class="badge pinned">
               <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
                 <path d="M9.8 1.1a.5.5 0 0 1 .35.15l4.6 4.6a.5.5 0 0 1-.35.85h-1.8l-2 2a1 1 0 0 0-.3.7v1.65a1 1 0 0 1-1.7.7L7 10.15l-3.65 3.7a.5.5 0 0 1-.7-.7L6.3 9.45 4.7 7.85a1 1 0 0 1 .7-1.7h1.65a1 1 0 0 0 .7-.3l2-2V1.6a.5.5 0 0 1 .05-.5Z"/>
@@ -165,12 +173,64 @@ const updatedAt      = computed(() => props.mr.review_activity_at ?? props.mr.up
 const updatedAgo     = computed(() => timeAgo(updatedAt.value));
 const pipelineStatus = computed(() => props.mr.head_pipeline?.status ?? null);
 const createdTitle   = computed(() => new Date(props.mr.created_at).toLocaleString());
+
+// Approval status — overall MR approval, not just whether the current user approved.
+// If user just approved locally (before next poll) we optimistically bump the count.
+const userInApprovedBy = computed(() => {
+  const uid = mrs.currentUserId;
+  if (!uid) return false;
+  return (props.mr.approved_by ?? []).some(a => a.user?.id === uid);
+});
+const localBump = computed(() => (props.approved && !userInApprovedBy.value ? 1 : 0));
+const approvedCount   = computed(() => (props.mr.approved_by?.length ?? 0) + localBump.value);
+const approvalsRequired = computed(() => {
+  const r = props.mr.approvals_required;
+  return typeof r === 'number' && r > 0 ? r : null;
+});
+const approvalsLeftEffective = computed(() => {
+  const l = props.mr.approvals_left;
+  if (typeof l !== 'number') return null;
+  return Math.max(0, l - localBump.value);
+});
+const fullyApproved = computed(() => {
+  if (approvalsLeftEffective.value !== null) return approvalsLeftEffective.value === 0;
+  // No threshold info: treat any approval as "approved" (best-effort signal).
+  return approvedCount.value > 0;
+});
+const showApprovalBadge = computed(() => approvedCount.value > 0 || approvalsRequired.value !== null);
+const approvalLabel = computed(() => {
+  if (approvalsRequired.value !== null) return `${approvedCount.value}/${approvalsRequired.value}`;
+  return String(approvedCount.value);
+});
+const approvalTitle = computed(() => {
+  const uid = mrs.currentUserId;
+  const names = (props.mr.approved_by ?? [])
+    .map(a => {
+      const u = a.user;
+      const label = u?.name || u?.username || `user ${u?.id}`;
+      return uid && uid === u?.id ? `${label} (you)` : label;
+    });
+  if (localBump.value === 1) names.push('You');
+  if (approvedCount.value === 0) {
+    const need = approvalsRequired.value ?? 0;
+    return need > 0 ? `Needs ${need} approval${need === 1 ? '' : 's'}` : 'Not yet approved';
+  }
+  const head = approvalsRequired.value !== null
+    ? `${approvedCount.value} of ${approvalsRequired.value} approval${approvalsRequired.value === 1 ? '' : 's'}`
+    : `Approved by ${approvedCount.value} reviewer${approvedCount.value === 1 ? '' : 's'}`;
+  return `${head} — ${names.join(', ')}`;
+});
 const activityLabel = computed(() => {
   if (!props.activity) return '';
-  if (props.activity.kind === 'new_mr') return 'New MR';
-  if (props.activity.kind === 'new_commit') return 'New commits';
-  if (props.activity.kind === 'author_comment') return 'Author replied';
-  return 'Updated';
+  switch (props.activity.kind) {
+    case 'new_mr':           return 'New MR';
+    case 'new_commit':       return 'New commits';
+    case 'author_comment':   return 'Author replied';
+    case 'approved':         return 'Approved';
+    case 'fully_approved':   return 'Ready to merge';
+    case 'approval_removed': return 'Approval removed';
+    default:                 return 'Updated';
+  }
 });
 const activityTitle = computed(() => {
   if (!props.activity) return '';
