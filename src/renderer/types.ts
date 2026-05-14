@@ -96,6 +96,29 @@ export interface MR {
   review_activity_kind?: 'commit' | 'author_comment' | 'created';
 }
 
+export type MrActivityKind = 'new_mr' | 'new_commit' | 'author_comment' | 'updated';
+
+export interface MrActivityEvent {
+  mrId: number;
+  projectId: number;
+  mrIid: number;
+  title: string;
+  queue: 'To Review' | 'My MRs';
+  kind: MrActivityKind;
+  previousActivityKey?: string;
+  activityKey: string;
+  activityAt?: string;
+  fromSha?: string;
+  toSha?: string;
+}
+
+export interface MrsUpdatePayload {
+  toReview: MR[];
+  myMrs: MR[];
+  currentUserId: number | null;
+  activityEvents?: MrActivityEvent[];
+}
+
 export interface AppSettings {
   gitlabToken: string;
   gitlabUrl: string;

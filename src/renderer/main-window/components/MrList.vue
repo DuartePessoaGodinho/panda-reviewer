@@ -13,6 +13,9 @@
       >
         <span class="mr-tab-label">{{ tab.label }}</span>
         <span class="mr-tab-count" :class="{ zero: tab.count === 0 }">{{ tab.count }}</span>
+        <span v-if="tab.unread > 0" class="mr-tab-unread" :title="`${tab.unread} unread update${tab.unread === 1 ? '' : 's'}`">
+          {{ tab.unread }}
+        </span>
       </button>
     </div>
     <FilterBar />
@@ -46,6 +49,7 @@
             :pinned="mrs.isPinned(mr)"
             :has-repo="mrs.repoCache[mr.project_id] != null"
             :ai-enabled="aiEnabled"
+            :activity="mrs.unreadActivityByMrId[mr.id] ?? null"
             @open="onOpen"
             @ai-review="onAiReview"
             @open-in-ide="onOpenInIde"
@@ -82,9 +86,9 @@ const loading = ref(true);
 const firstLoad = ref(true);
 
 const tabs = computed(() => [
-  { key: 'review' as const, label: 'To Review', count: mrs.toReviewMrs.length },
-  { key: 'mine'   as const, label: 'My MRs',    count: mrs.myMrs.length },
-  { key: 'pinned' as const, label: 'Pinned',    count: mrs.pinnedMrs.length },
+  { key: 'review' as const, label: 'To Review', count: mrs.toReviewMrs.length, unread: mrs.unreadReviewCount },
+  { key: 'mine'   as const, label: 'My MRs',    count: mrs.myMrs.length, unread: mrs.unreadMyMrsCount },
+  { key: 'pinned' as const, label: 'Pinned',    count: mrs.pinnedMrs.length, unread: mrs.unreadPinnedCount },
 ]);
 
 onMounted(() => {
@@ -247,6 +251,24 @@ defineExpose({ clearLoading: () => { loading.value = false; } });
 .mr-tab-count.zero {
   background: transparent;
   color: var(--text3);
+}
+
+.mr-tab-unread {
+  min-width: 17px;
+  height: 17px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--orange);
+  color: white;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 1;
+  box-shadow: 0 0 12px rgba(232,109,48,0.22);
+  flex-shrink: 0;
 }
 
 .mr-list {

@@ -374,6 +374,9 @@ body {
 .badge.comments     { background: var(--surface2);        color: var(--text2);  }
 .badge.pinned       { background: rgba(201,154,13,0.12);  color: var(--yellow); border: 1px solid rgba(201,154,13,0.2); }
 .badge.updated      { background: rgba(232,109,48,0.10);  color: var(--orange); border: 1px solid rgba(232,109,48,0.22); }
+.badge.live-update  { background: rgba(232,109,48,0.12);  color: var(--orange); border: 1px solid rgba(232,109,48,0.28); }
+.badge.activity-author_comment { background: rgba(91,141,239,0.11); color: #5b8def; border-color: rgba(91,141,239,0.24); }
+.badge.activity-new_mr { background: rgba(30,214,154,0.09); color: var(--green); border-color: rgba(30,214,154,0.22); }
 
 /* ── Toast notifications ── */
 .toast-container {

@@ -4,6 +4,7 @@ import type {
   GitLabDiscussion,
   GitLabDiscussionNote,
   MergeRequestVersion,
+  MrsUpdatePayload,
   ReviewCheckpoint,
   ReviewEntry,
 } from './types';
@@ -11,7 +12,7 @@ import type {
 interface ElectronAPI {
   getSettings: () => Promise<any>;
   saveSettings: (s: any) => Promise<any>;
-  getMrs: () => Promise<{ toReview: any[]; myMrs: any[]; currentUserId: number | null }>;
+  getMrs: () => Promise<MrsUpdatePayload>;
   getMrDiff: (projectId: number, mrIid: number) => Promise<any>;
   getNewChangesDiff: (projectId: number, fromSha: string, toSha: string) => Promise<any>;
   getMrDiscussions: (projectId: number, mrIid: number) => Promise<GitLabDiscussion[]>;
@@ -49,7 +50,7 @@ interface ElectronAPI {
   onClaudeChunk: (cb: (text: string) => void) => void;
   onClaudeDone:  (cb: () => void) => void;
   onClaudeError: (cb: (msg: string) => void) => void;
-  onMrsUpdated: (cb: (data: any) => void) => void;
+  onMrsUpdated: (cb: (data: MrsUpdatePayload) => void) => void;
   onSettingsUpdated: (cb: (data: any) => void) => void;
   onShowSettings: (cb: () => void) => void;
 }

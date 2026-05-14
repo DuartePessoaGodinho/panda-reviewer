@@ -1,8 +1,9 @@
 import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
-import type { MR, ReviewCheckpoint } from '../../types';
+import type { MR, MrActivityEvent, MrsUpdatePayload, ReviewCheckpoint } from '../../types';
 
 const PINNED_MRS_STORAGE_KEY = 'pinnedMrIds';
+const UNREAD_ACTIVITY_STORAGE_KEY = 'unreadMrActivity';
 
 function loadPinnedIds(): Set<number> {
   try {
@@ -20,6 +21,24 @@ function savePinnedIds(ids: Set<number>) {
   localStorage.setItem(PINNED_MRS_STORAGE_KEY, JSON.stringify([...ids]));
 }
 
+function loadUnreadActivity(): Record<number, MrActivityEvent> {
+  try {
+    const raw = localStorage.getItem(UNREAD_ACTIVITY_STORAGE_KEY);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return {};
+    return Object.fromEntries(
+      Object.entries(parsed).filter(([id, value]) => Number.isInteger(Number(id)) && value && typeof value === 'object')
+    ) as Record<number, MrActivityEvent>;
+  } catch {
+    return {};
+  }
+}
+
+function saveUnreadActivity(activity: Record<number, MrActivityEvent>) {
+  localStorage.setItem(UNREAD_ACTIVITY_STORAGE_KEY, JSON.stringify(activity));
+}
+
 export const useMrsStore = defineStore('mrs', () => {
   const toReviewMrs = ref<MR[]>([]);
   const myMrs = ref<MR[]>([]);
@@ -31,10 +50,17 @@ export const useMrsStore = defineStore('mrs', () => {
   const repoCache = ref<Record<number, string | null>>({});
   const pinnedMrIds = ref(loadPinnedIds());
   const reviewCheckpoints = ref<Record<number, ReviewCheckpoint>>({});
+  const unreadActivityByMrId = ref<Record<number, MrActivityEvent>>(loadUnreadActivity());
 
   const allMrs = computed(() => [...toReviewMrs.value, ...myMrs.value]);
   const uniqueOpenMrs = computed(() => [...new Map(allMrs.value.map(mr => [mr.id, mr])).values()]);
   const pinnedMrs = computed(() => uniqueOpenMrs.value.filter(mr => pinnedMrIds.value.has(mr.id)));
+  const activeActivity = computed(() =>
+    activeMr.value ? unreadActivityByMrId.value[activeMr.value.id] ?? null : null
+  );
+  const unreadReviewCount = computed(() => toReviewMrs.value.filter(mr => unreadActivityByMrId.value[mr.id]).length);
+  const unreadMyMrsCount = computed(() => myMrs.value.filter(mr => unreadActivityByMrId.value[mr.id]).length);
+  const unreadPinnedCount = computed(() => pinnedMrs.value.filter(mr => unreadActivityByMrId.value[mr.id]).length);
 
   function approvedByMe(mr: MR): boolean {
     if (locallyApproved.value.has(mr.id)) return true;
@@ -72,6 +98,7 @@ export const useMrsStore = defineStore('mrs', () => {
       kind,
     });
     reviewCheckpoints.value[mr.id] = checkpoint;
+    clearUnreadActivity(mr.id);
     return checkpoint;
   }
 
@@ -100,10 +127,35 @@ export const useMrsStore = defineStore('mrs', () => {
     aiDrawerOpen.value = open;
   }
 
-  function update(data: { toReview: MR[]; myMrs: MR[]; currentUserId: number | null }) {
+  function mergeUnreadActivity(events: MrActivityEvent[] | undefined, openMrIds: Set<number>) {
+    const next = { ...unreadActivityByMrId.value };
+    for (const id of Object.keys(next)) {
+      if (!openMrIds.has(Number(id))) delete next[Number(id)];
+    }
+    for (const event of events ?? []) {
+      next[event.mrId] = event;
+    }
+    unreadActivityByMrId.value = next;
+    saveUnreadActivity(next);
+  }
+
+  function clearUnreadActivity(mrId: number) {
+    if (!unreadActivityByMrId.value[mrId]) return;
+    const next = { ...unreadActivityByMrId.value };
+    delete next[mrId];
+    unreadActivityByMrId.value = next;
+    saveUnreadActivity(next);
+  }
+
+  function update(data: MrsUpdatePayload) {
     toReviewMrs.value = data.toReview;
     myMrs.value = data.myMrs;
     if (data.currentUserId) currentUserId.value = data.currentUserId;
+    const openMrIds = new Set([...data.toReview, ...data.myMrs].map(mr => mr.id));
+    mergeUnreadActivity(data.activityEvents, openMrIds);
+    if (activeMr.value) {
+      activeMr.value = findById(activeMr.value.id);
+    }
   }
 
   function setRepoCache(projectId: number, path: string | null) {
@@ -125,9 +177,14 @@ export const useMrsStore = defineStore('mrs', () => {
     repoCache,
     pinnedMrIds,
     reviewCheckpoints,
+    unreadActivityByMrId,
     allMrs,
     uniqueOpenMrs,
     pinnedMrs,
+    activeActivity,
+    unreadReviewCount,
+    unreadMyMrsCount,
+    unreadPinnedCount,
     approvedByMe,
     findById,
     markApproved,
@@ -138,6 +195,7 @@ export const useMrsStore = defineStore('mrs', () => {
     setActiveMr,
     setActivePanelTab,
     setAiDrawerOpen,
+    clearUnreadActivity,
     update,
     setRepoCache,
     clearRepoCache,

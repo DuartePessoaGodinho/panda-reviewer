@@ -113,6 +113,32 @@
                 </span>
               </div>
             </div>
+            <div v-if="activeActivity" class="live-activity-banner" :class="`activity-${activeActivity.kind}`">
+              <div class="live-activity-main">
+                <span class="live-activity-dot"></span>
+                <div class="live-activity-copy">
+                  <strong>{{ activityBannerTitle }}</strong>
+                  <span>{{ activityBannerDetail }}</span>
+                </div>
+              </div>
+              <div class="live-activity-actions">
+                <button
+                  v-if="activeActivity.kind === 'new_commit'"
+                  class="live-activity-btn primary"
+                  :disabled="!hasNewChanges"
+                  :title="newChangesTitle"
+                  @click="showActivityChanges"
+                >
+                  Show new changes
+                </button>
+                <button class="live-activity-btn" @click="markActivitySeen">Mark seen</button>
+                <button class="live-activity-btn icon" title="Open in GitLab" @click="openActiveInGitLab">
+                  <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+                    <path d="M10.604 1h4.146a.25.25 0 0 1 .25.25v4.146a.25.25 0 0 1-.427.177L13.03 4.03 9.28 7.78a.75.75 0 0 1-1.06-1.06l3.75-3.75-1.543-1.543A.25.25 0 0 1 10.604 1zM3.75 2A1.75 1.75 0 0 0 2 3.75v8.5c0 .966.784 1.75 1.75 1.75h8.5A1.75 1.75 0 0 0 14 12.25v-3.5a.75.75 0 0 0-1.5 0v3.5a.25.25 0 0 1-.25.25h-8.5a.25.25 0 0 1-.25-.25v-8.5a.25.25 0 0 1 .25-.25h3.5a.75.75 0 0 0 0-1.5h-3.5z"/>
+                  </svg>
+                </button>
+              </div>
+            </div>
             <div
               class="review-checkpoint-bar"
               :class="{
@@ -377,6 +403,7 @@ type DiffLinePosition = {
 };
 const changedLines = computed(() => diffStats.value.added + diffStats.value.deleted);
 const currentSha = computed(() => mrs.activeMr?.sha ?? '');
+const activeActivity = computed(() => mrs.activeActivity);
 const commentState = computed(() => comments.getState(mrs.activeMr));
 const commentTabCount = computed(() =>
   commentState.value.discussions.filter(discussion => discussion.notes.some(note => !note.system)).length
@@ -394,9 +421,19 @@ const aiReviewTitle = computed(() => {
 const shouldShowDiff = computed(() =>
   Boolean(mrs.activeMr && mrs.activePanelTab !== 'comments' && (!isCompact.value || mrs.activePanelTab === 'diff'))
 );
-const hasNewChanges = computed(() =>
-  Boolean(checkpoint.value?.sourceSha && currentSha.value && checkpoint.value.sourceSha !== currentSha.value)
-);
+const activityCommitRange = computed(() => {
+  const activity = activeActivity.value;
+  if (activity?.kind !== 'new_commit') return null;
+  if (!activity.fromSha || !activity.toSha || activity.fromSha === activity.toSha) return null;
+  return { fromSha: activity.fromSha, toSha: activity.toSha };
+});
+const newDiffRange = computed(() => {
+  if (checkpoint.value?.sourceSha && currentSha.value && checkpoint.value.sourceSha !== currentSha.value) {
+    return { fromSha: checkpoint.value.sourceSha, toSha: currentSha.value };
+  }
+  return activityCommitRange.value;
+});
+const hasNewChanges = computed(() => Boolean(newDiffRange.value));
 const isCurrentHeadReviewed = computed(() =>
   Boolean(checkpoint.value?.sourceSha && currentSha.value && checkpoint.value.sourceSha === currentSha.value)
 );
@@ -416,10 +453,9 @@ const checkpointAge = computed(() => {
   });
 });
 const newChangesTitle = computed(() => {
-  if (!checkpoint.value) return 'Mark this MR reviewed before tracking new changes';
-  if (!currentSha.value) return 'Current MR head is unavailable';
-  if (!hasNewChanges.value) return 'No new commits since your last Panda review';
-  return `Show changes from ${shortSha(checkpoint.value.sourceSha)} to ${shortSha(currentSha.value)}`;
+  const range = newDiffRange.value;
+  if (!range) return checkpoint.value ? 'No new commits since your last Panda review' : 'No live commit range available';
+  return `Show changes from ${shortSha(range.fromSha)} to ${shortSha(range.toSha)}`;
 });
 const aiDrawerStyle = computed<CSSProperties>(() => {
   if (aiDrawerFullscreen.value) return {};
@@ -478,6 +514,42 @@ function shortSha(sha: string) {
 
 function showDiff() {
   mrs.setActivePanelTab('diff');
+}
+
+const activityBannerTitle = computed(() => {
+  const activity = activeActivity.value;
+  if (!activity) return '';
+  if (activity.kind === 'new_mr') return 'New merge request in your queue';
+  if (activity.kind === 'new_commit') return 'New commits arrived on this merge request';
+  if (activity.kind === 'author_comment') return 'Author replied on this merge request';
+  return 'Merge request updated';
+});
+
+const activityBannerDetail = computed(() => {
+  const activity = activeActivity.value;
+  if (!activity) return '';
+  const at = activity.activityAt
+    ? new Date(activity.activityAt).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+    : 'just now';
+  if (activity.kind === 'new_commit' && activity.fromSha && activity.toSha) {
+    return `${activity.queue} changed at ${at}, ${shortSha(activity.fromSha)} to ${shortSha(activity.toSha)}.`;
+  }
+  return `${activity.queue} changed at ${at}.`;
+});
+
+function showActivityChanges() {
+  if (!hasNewChanges.value) return;
+  diffMode.value = 'new';
+}
+
+function markActivitySeen() {
+  if (!mrs.activeMr) return;
+  mrs.clearUnreadActivity(mrs.activeMr.id);
+}
+
+function openActiveInGitLab() {
+  if (!mrs.activeMr?.web_url) return;
+  window.api.openExternal(mrs.activeMr.web_url);
 }
 
 function showComments() {
@@ -1344,11 +1416,12 @@ async function loadDiff() {
   try {
     await comments.load(mr);
     if (diffMode.value === 'new') {
-      if (!checkpoint.value || !hasNewChanges.value) {
+      const range = newDiffRange.value;
+      if (!range) {
         diffMode.value = 'full';
       } else {
         const [newChangesDiff, fullMrDiff] = await Promise.all([
-          window.api.getNewChangesDiff(mr.project_id, checkpoint.value.sourceSha, currentSha.value),
+          window.api.getNewChangesDiff(mr.project_id, range.fromSha, range.toSha),
           window.api.getMrDiff(mr.project_id, mr.iid),
         ]);
         const changes = newChangesDiff.changes;
@@ -2087,6 +2160,134 @@ onBeforeUnmount(() => {
 
 .diff-stat.del .diff-stat-value {
   color: var(--diff-del);
+}
+
+.live-activity-banner {
+  min-height: 44px;
+  flex-shrink: 0;
+  padding: 8px 14px;
+  border-bottom: 1px solid rgba(232,109,48,0.22);
+  background:
+    linear-gradient(90deg, rgba(232,109,48,0.12), transparent 46%),
+    var(--diff-panel);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.live-activity-banner.activity-author_comment {
+  border-bottom-color: rgba(91,141,239,0.22);
+  background:
+    linear-gradient(90deg, rgba(91,141,239,0.11), transparent 46%),
+    var(--diff-panel);
+}
+
+.live-activity-banner.activity-new_mr {
+  border-bottom-color: rgba(30,214,154,0.2);
+  background:
+    linear-gradient(90deg, rgba(30,214,154,0.1), transparent 46%),
+    var(--diff-panel);
+}
+
+.live-activity-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+
+.live-activity-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--orange);
+  box-shadow: 0 0 12px rgba(232,109,48,0.28);
+  flex-shrink: 0;
+}
+
+.activity-author_comment .live-activity-dot {
+  background: #5b8def;
+  box-shadow: 0 0 12px rgba(91,141,239,0.26);
+}
+
+.activity-new_mr .live-activity-dot {
+  background: var(--accent);
+  box-shadow: 0 0 12px var(--accent-glow);
+}
+
+.live-activity-copy {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.live-activity-copy strong {
+  color: var(--text);
+  font-size: 12.5px;
+  line-height: 1.2;
+}
+
+.live-activity-copy span {
+  color: var(--text3);
+  font-size: 11.5px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.live-activity-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.live-activity-btn {
+  height: 27px;
+  padding: 0 10px;
+  border: 1px solid var(--diff-border);
+  border-radius: var(--radius-sm);
+  background: var(--diff-bg);
+  color: var(--text2);
+  cursor: pointer;
+  font-family: var(--font-ui);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  transition: background var(--dur-fast), border-color var(--dur-fast), color var(--dur-fast), transform var(--dur-fast) var(--ease-spring);
+}
+
+.live-activity-btn.icon {
+  width: 30px;
+  padding: 0;
+}
+
+.live-activity-btn.primary {
+  border-color: rgba(232,109,48,0.32);
+  background: rgba(232,109,48,0.12);
+  color: var(--orange);
+}
+
+.live-activity-btn:hover:not(:disabled) {
+  color: var(--text);
+  border-color: var(--border2);
+  background: var(--diff-toggle-hover);
+  transform: translateY(-1px);
+}
+
+.live-activity-btn.primary:hover:not(:disabled) {
+  border-color: rgba(232,109,48,0.48);
+  background: rgba(232,109,48,0.18);
+}
+
+.live-activity-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
 }
 
 .review-checkpoint-bar {

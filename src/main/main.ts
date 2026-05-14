@@ -336,10 +336,15 @@ app.whenReady().then(() => {
     openMain();
   }
 
-  setUpdateCallback((toReview, myMrs) => {
+  setUpdateCallback((toReview, myMrs, activityEvents) => {
     cachedToReview = toReview;
     cachedMyMrs = myMrs;
-    mainWindow?.webContents.send('mrs-updated', { toReview, myMrs, currentUserId: getCurrentUserId() });
+    mainWindow?.webContents.send('mrs-updated', {
+      toReview,
+      myMrs,
+      currentUserId: getCurrentUserId(),
+      activityEvents,
+    });
   });
 
   startPolling();

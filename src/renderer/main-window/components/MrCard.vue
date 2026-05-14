@@ -36,7 +36,10 @@
               </svg>
               Pinned
             </span>
-            <span v-if="hasNewChanges" class="badge updated" title="New commits since your last review">↑ New</span>
+            <span v-if="activity" class="badge live-update" :class="`activity-${activity.kind}`" :title="activityTitle">
+              {{ activityLabel }}
+            </span>
+            <span v-else-if="hasNewChanges" class="badge updated" title="New commits since your last review">↑ New</span>
             <span v-if="mr.user_notes_count > 0" class="badge comments" :title="`${mr.user_notes_count} comment${mr.user_notes_count !== 1 ? 's' : ''}`">
               <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
                 <path d="M2 3.5A2.5 2.5 0 0 1 4.5 1h7A2.5 2.5 0 0 1 14 3.5v4A2.5 2.5 0 0 1 11.5 10H7.9l-3.2 2.4A.45.45 0 0 1 4 12.04V10A2 2 0 0 1 2 8V3.5Z"/>
@@ -110,7 +113,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted } from 'vue';
-import type { MR } from '../../types';
+import type { MR, MrActivityEvent } from '../../types';
 import { useMrsStore } from '../stores/mrs';
 import { isDraft, displayTitle, projectName, timeAgo } from '../utils';
 
@@ -121,6 +124,7 @@ const props = defineProps<{
   pinned: boolean;
   hasRepo: boolean;
   aiEnabled: boolean;
+  activity: MrActivityEvent | null;
 }>();
 
 defineEmits<{
@@ -161,12 +165,24 @@ const updatedAt      = computed(() => props.mr.review_activity_at ?? props.mr.up
 const updatedAgo     = computed(() => timeAgo(updatedAt.value));
 const pipelineStatus = computed(() => props.mr.head_pipeline?.status ?? null);
 const createdTitle   = computed(() => new Date(props.mr.created_at).toLocaleString());
-const activityLabel  = computed(() => {
+const activityLabel = computed(() => {
+  if (!props.activity) return '';
+  if (props.activity.kind === 'new_mr') return 'New MR';
+  if (props.activity.kind === 'new_commit') return 'New commits';
+  if (props.activity.kind === 'author_comment') return 'Author replied';
+  return 'Updated';
+});
+const activityTitle = computed(() => {
+  if (!props.activity) return '';
+  const at = props.activity.activityAt ? new Date(props.activity.activityAt).toLocaleString() : 'just now';
+  return `${activityLabel.value} - ${at}`;
+});
+const activitySourceLabel = computed(() => {
   if (props.mr.review_activity_kind === 'author_comment') return 'Latest author comment';
   if (props.mr.review_activity_kind === 'commit') return 'Latest commit';
   return 'Latest review activity';
 });
-const updatedTitle   = computed(() => `${activityLabel.value}: ${new Date(updatedAt.value).toLocaleString()}`);
+const updatedTitle   = computed(() => `${activitySourceLabel.value}: ${new Date(updatedAt.value).toLocaleString()}`);
 
 const aiDisabledTitle = computed(() => {
   if (!props.aiEnabled) return 'Enable AI Review in Settings first';
