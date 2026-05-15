@@ -19,6 +19,12 @@ import { AiReviewProvider, startAiReview, cancelAiReview, checkAiReviewCli, isRe
 
 app.setAppUserModelId('com.panda-reviewer.app');
 
+const hasSingleInstanceLock = app.requestSingleInstanceLock();
+
+if (!hasSingleInstanceLock) {
+  app.exit(0);
+}
+
 let tray: Tray | null = null;
 let mainWindow: BrowserWindow | null = null;
 
@@ -70,9 +76,22 @@ function openSettings(): void {
 }
 
 function openMain(): void {
-  if (mainWindow) { mainWindow.focus(); return; }
+  if (mainWindow) {
+    if (mainWindow.isMinimized()) mainWindow.restore();
+    mainWindow.show();
+    mainWindow.focus();
+    return;
+  }
   mainWindow = createMainWindow();
 }
+
+app.on('second-instance', () => {
+  if (app.isReady()) {
+    openMain();
+  } else {
+    app.once('ready', openMain);
+  }
+});
 
 function setupTray(): void {
   const icon = nativeImage.createFromPath(getIconPath()).resize({ width: 16, height: 16 });
