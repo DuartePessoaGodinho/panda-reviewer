@@ -12,6 +12,6 @@
     "baseUrl": ".",
     "paths": { "@/*": ["src/renderer/*"] }
   },
-  "include": ["src/renderer/main-window/**/*", "src/renderer/settings-window/**/*", "src/renderer/types.ts", "src/renderer/global.d.ts"],
+  "include": ["src/renderer/main-window/**/*", "src/renderer/types.ts", "src/renderer/global.d.ts"],
   "exclude": ["node_modules", "dist"]
 }

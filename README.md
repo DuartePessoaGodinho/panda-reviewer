@@ -46,6 +46,12 @@ Download the latest release from the [Releases](../../releases) page:
 
 The app lives in the system tray from that point on.
 
+## Development
+
+- `npm run dev` builds the Electron main process, starts Vite, and launches the app.
+- `npm run build` type-checks and builds the Electron and renderer bundles.
+- `npm run icons` regenerates `assets/icon.png` and `assets/icon.ico` from the scripted panda artwork. The Windows package uses `assets/icon.ico`; the Electron window and tray use `assets/icon.png`.
+
 ---
 
 Built with Electron.

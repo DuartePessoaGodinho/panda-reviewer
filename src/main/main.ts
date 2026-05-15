@@ -224,53 +224,12 @@ ipcMain.handle('debug-state', () => ({ poll: getDebugState(), cache: { toReview:
 
 // ── AI Review ─────────────────────────────────────────────────────────────
 
-ipcMain.handle('check-claude-cli', async () => {
-  return checkAiReviewCli('claude');
-});
-
 ipcMain.handle('check-ai-review-cli', (_e, provider: AiReviewProvider) => checkAiReviewCli(provider));
 
 ipcMain.handle('find-local-repo-for-mr', (_e, projectHttpUrl: string) => {
   const { repoPaths } = getSettings();
   buildRepoCache(repoPaths);
   return findLocalRepo(projectHttpUrl);
-});
-
-ipcMain.handle('start-claude-review', async (_e, payload: {
-  repoPath: string;
-  sourceBranch: string;
-  targetBranch: string;
-  mrIid?: number;
-  mrTitle: string;
-  userContext: string;
-}) => {
-  const { aiReviewEnabled, aiReviewProvider } = getSettings();
-  if (!aiReviewEnabled) {
-    mainWindow?.webContents.send('claude-error', 'AI Review is disabled in Settings.');
-    return;
-  }
-
-  if (isReviewRunning()) cancelAiReview();
-
-  try {
-    await startAiReview(
-      aiReviewProvider,
-      payload.repoPath,
-      payload.sourceBranch,
-      payload.targetBranch,
-      payload.mrIid,
-      payload.mrTitle,
-      payload.userContext,
-      {
-        onChunk: (text) => mainWindow?.webContents.send('claude-chunk', text),
-        onDone:  ()     => mainWindow?.webContents.send('claude-done'),
-        onError: (msg)  => mainWindow?.webContents.send('claude-error', msg),
-      }
-    );
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    mainWindow?.webContents.send('claude-error', `Failed to update local MR refs before AI Review: ${msg}`);
-  }
 });
 
 ipcMain.handle('start-ai-review', async (_e, payload: {
@@ -311,7 +270,6 @@ ipcMain.handle('start-ai-review', async (_e, payload: {
   }
 });
 
-ipcMain.handle('cancel-claude-review', () => cancelAiReview());
 ipcMain.handle('cancel-ai-review', () => cancelAiReview());
 
 ipcMain.handle('approve-mr', async (_e, projectId: number, mrIid: number) => {
