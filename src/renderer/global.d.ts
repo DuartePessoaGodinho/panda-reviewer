@@ -37,6 +37,7 @@ interface ElectronAPI {
   startAiReview: (payload: { provider?: AiReviewProvider; repoPath: string; sourceBranch: string; targetBranch: string; mrIid?: number; mrTitle: string; userContext: string }) => Promise<void>;
   cancelAiReview: () => Promise<void>;
   approveMr: (projectId: number, mrIid: number) => Promise<void>;
+  unapproveMr: (projectId: number, mrIid: number) => Promise<void>;
   getReviewContext: (mrId: number) => Promise<string>;
   saveReviewContext: (mrId: number, text: string) => Promise<void>;
   getReviewHistory: (mrId: number) => Promise<ReviewEntry[]>;

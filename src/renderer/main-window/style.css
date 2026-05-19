@@ -319,25 +319,6 @@ body {
 .btn-sm.ide-btn { flex: 0; padding: 5px 7px; }
 .btn-sm:disabled { opacity: 0.28; cursor: not-allowed; pointer-events: none; }
 
-/* AI button */
-.btn-sm.ai {
-  background: var(--accent-dim);
-  border-color: var(--accent-border);
-  color: var(--accent);
-  font-weight: 600;
-}
-.btn-sm.ai:hover:not(:disabled) {
-  background: rgba(30,214,154,0.16);
-  border-color: var(--accent);
-  color: var(--accent);
-  box-shadow: 0 0 18px var(--accent-glow);
-  transform: translateY(-1px);
-}
-.btn-sm.ai:active:not(:disabled) {
-  transform: scale(0.97);
-}
-.btn-sm.ai:disabled { opacity: 0.28; }
-
 /* Approve button */
 .btn-sm.approve-btn {
   background: transparent;
@@ -348,6 +329,18 @@ body {
 .btn-sm.approve-btn:hover:not(:disabled) {
   background: var(--accent-dim);
   border-color: var(--accent-border);
+  transform: translateY(-1px);
+}
+
+.btn-sm.unapprove-btn {
+  background: transparent;
+  border-color: rgba(229,83,75,0.18);
+  color: var(--red);
+  font-weight: 500;
+}
+.btn-sm.unapprove-btn:hover:not(:disabled) {
+  background: rgba(229,83,75,0.10);
+  border-color: rgba(229,83,75,0.34);
   transform: translateY(-1px);
 }
 

@@ -38,6 +38,7 @@ contextBridge.exposeInMainWorld('api', {
   startAiReview: (payload: unknown) => ipcRenderer.invoke('start-ai-review', payload),
   cancelAiReview: () => ipcRenderer.invoke('cancel-ai-review'),
   approveMr: (projectId: number, mrIid: number) => ipcRenderer.invoke('approve-mr', projectId, mrIid),
+  unapproveMr: (projectId: number, mrIid: number) => ipcRenderer.invoke('unapprove-mr', projectId, mrIid),
   getReviewContext: (mrId: number) => ipcRenderer.invoke('get-review-context', mrId),
   saveReviewContext: (mrId: number, text: string) => ipcRenderer.invoke('save-review-context', mrId, text),
   getReviewHistory: (mrId: number) => ipcRenderer.invoke('get-review-history', mrId),

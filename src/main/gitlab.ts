@@ -461,4 +461,13 @@ export class GitLabService {
     });
     if (!res.ok) throw new Error(`GitLab API ${res.status}: approve MR`);
   }
+
+  async unapproveMr(projectId: number, mrIid: number): Promise<void> {
+    const url = `${this.baseUrl}/projects/${projectId}/merge_requests/${mrIid}/unapprove`;
+    const res = await net.fetch(url, {
+      method: 'POST',
+      headers: { 'PRIVATE-TOKEN': this.token },
+    });
+    if (!res.ok) throw new Error(`GitLab API ${res.status}: unapprove MR`);
+  }
 }

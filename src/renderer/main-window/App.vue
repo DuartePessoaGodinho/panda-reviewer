@@ -69,9 +69,7 @@
           <div v-else key="main" class="split">
             <MrList
               ref="mrListRef"
-              :ai-enabled="aiEnabled"
               @open="onMrOpen"
-              @ai-review="onAiReview"
               @clone-needed="showCloneDialog"
             />
             <DiffPanel :ai-enabled="aiEnabled" :provider-label="providerLabel" />
@@ -195,12 +193,6 @@ function onMrOpen(mr: MR) {
   mrs.setActiveMr(mr);
   mrs.setActivePanelTab(isRunningReview ? 'ai' : 'diff');
   mrs.setAiDrawerOpen(isRunningReview);
-}
-
-function onAiReview(mr: MR) {
-  mrs.setActiveMr(mr);
-  mrs.setActivePanelTab('ai');
-  mrs.setAiDrawerOpen(true);
 }
 
 function showCloneDialog(url: string) { cloneUrl.value = url; }

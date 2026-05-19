@@ -78,18 +78,7 @@
       </div>
     </div>
 
-    <div class="card-actions" :class="{ 'has-approve': !approved }" @click.stop>
-      <button
-        class="btn-sm ai"
-        :disabled="!hasRepo || !aiEnabled"
-        :title="aiDisabledTitle"
-        @click="$emit('ai-review', mr)"
-      >
-        <svg width="9" height="9" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
-          <path d="M8 0l1.5 5H16l-4.5 3.5L13 14 8 10l-5 4 1.5-5.5L0 5h6.5L8 0z"/>
-        </svg>
-        AI Review
-      </button>
+    <div class="card-actions" @click.stop>
       <button
         class="btn-sm pin-btn"
         :class="{ active: pinned }"
@@ -109,6 +98,9 @@
       </button>
       <button v-if="!approved" class="btn-sm approve-btn" title="Approve this MR" @click="$emit('approve', mr)">
         ✓ Approve
+      </button>
+      <button v-else class="btn-sm unapprove-btn" title="Remove your approval" @click="$emit('unapprove', mr)">
+        ↺ Unapprove
       </button>
       <button class="btn-sm link" title="Open in browser" @click="$emit('open-external', mr.web_url)">
         <svg width="11" height="11" viewBox="0 0 16 16" fill="currentColor">
@@ -130,16 +122,14 @@ const props = defineProps<{
   isActive: boolean;
   approved: boolean;
   pinned: boolean;
-  hasRepo: boolean;
-  aiEnabled: boolean;
   activity: MrActivityEvent | null;
 }>();
 
 defineEmits<{
   open: [mr: MR];
-  'ai-review': [mr: MR];
   'open-in-ide': [mr: MR];
   approve: [mr: MR];
+  unapprove: [mr: MR];
   'toggle-pin': [mr: MR];
   'open-external': [url: string];
 }>();
@@ -181,8 +171,12 @@ const userInApprovedBy = computed(() => {
   if (!uid) return false;
   return (props.mr.approved_by ?? []).some(a => a.user?.id === uid);
 });
-const localBump = computed(() => (props.approved && !userInApprovedBy.value ? 1 : 0));
-const approvedCount   = computed(() => (props.mr.approved_by?.length ?? 0) + localBump.value);
+const localApprovalDelta = computed(() => {
+  if (props.approved && !userInApprovedBy.value) return 1;
+  if (!props.approved && userInApprovedBy.value) return -1;
+  return 0;
+});
+const approvedCount = computed(() => Math.max(0, (props.mr.approved_by?.length ?? 0) + localApprovalDelta.value));
 const approvalsRequired = computed(() => {
   const r = props.mr.approvals_required;
   return typeof r === 'number' && r > 0 ? r : null;
@@ -190,7 +184,7 @@ const approvalsRequired = computed(() => {
 const approvalsLeftEffective = computed(() => {
   const l = props.mr.approvals_left;
   if (typeof l !== 'number') return null;
-  return Math.max(0, l - localBump.value);
+  return Math.max(0, l - localApprovalDelta.value);
 });
 const fullyApproved = computed(() => {
   if (approvalsLeftEffective.value !== null) return approvalsLeftEffective.value === 0;
@@ -205,12 +199,13 @@ const approvalLabel = computed(() => {
 const approvalTitle = computed(() => {
   const uid = mrs.currentUserId;
   const names = (props.mr.approved_by ?? [])
+    .filter(a => !(localApprovalDelta.value === -1 && uid && uid === a.user?.id))
     .map(a => {
       const u = a.user;
       const label = u?.name || u?.username || `user ${u?.id}`;
       return uid && uid === u?.id ? `${label} (you)` : label;
     });
-  if (localBump.value === 1) names.push('You');
+  if (localApprovalDelta.value === 1) names.push('You');
   if (approvedCount.value === 0) {
     const need = approvalsRequired.value ?? 0;
     return need > 0 ? `Needs ${need} approval${need === 1 ? '' : 's'}` : 'Not yet approved';
@@ -243,12 +238,6 @@ const activitySourceLabel = computed(() => {
   return 'Latest review activity';
 });
 const updatedTitle   = computed(() => `${activitySourceLabel.value}: ${new Date(updatedAt.value).toLocaleString()}`);
-
-const aiDisabledTitle = computed(() => {
-  if (!props.aiEnabled) return 'Enable AI Review in Settings first';
-  if (!props.hasRepo)   return 'Clone this repo first to enable AI Review';
-  return '';
-});
 </script>
 
 <style scoped>
@@ -344,8 +333,7 @@ const aiDisabledTitle = computed(() => {
   border-color: var(--border2);
   box-shadow: 0 0 0 2px var(--accent-bg);
 }
-.mr-card:hover::after,
-.mr-card:focus-within::after {
+.mr-card:hover::after {
   opacity: 1;
 }
 
@@ -445,9 +433,9 @@ const aiDisabledTitle = computed(() => {
   right: 14px;
   bottom: 10px;
   z-index: 2;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 33px 33px 33px;
-  gap: 5px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
   opacity: 0;
   visibility: hidden;
   pointer-events: none;
@@ -457,11 +445,7 @@ const aiDisabledTitle = computed(() => {
     transform var(--dur-base) var(--ease-out),
     visibility 0s linear var(--dur-base);
 }
-.card-actions.has-approve {
-  grid-template-columns: minmax(0, 1fr) 33px 33px minmax(92px, 0.8fr) 33px;
-}
-.mr-card:hover .card-actions,
-.mr-card:focus-within .card-actions {
+.mr-card:hover .card-actions {
   opacity: 1;
   visibility: visible;
   pointer-events: auto;
@@ -472,13 +456,32 @@ const aiDisabledTitle = computed(() => {
     visibility 0s;
 }
 
+.card-actions .btn-sm {
+  flex: 0 0 auto;
+  height: 34px;
+}
+
+.card-actions .pin-btn,
+.card-actions .ide-btn,
+.card-actions .link {
+  width: 34px;
+  padding: 0;
+}
+
 .pin-btn {
   flex: 0;
-  padding: 5px 7px;
 }
 .pin-btn.active {
   background: rgba(201,154,13,0.12);
   border-color: rgba(201,154,13,0.35);
   color: var(--yellow);
+}
+
+.approve-btn,
+.unapprove-btn {
+  flex: 0 0 auto;
+  margin-left: auto;
+  min-width: 108px;
+  padding-inline: 12px;
 }
 </style>

@@ -278,6 +278,12 @@ ipcMain.handle('approve-mr', async (_e, projectId: number, mrIid: number) => {
   await svc.approveMr(projectId, mrIid);
 });
 
+ipcMain.handle('unapprove-mr', async (_e, projectId: number, mrIid: number) => {
+  const { gitlabToken, gitlabUrl } = getSettings();
+  const svc = new GitLabService(gitlabUrl, gitlabToken);
+  await svc.unapproveMr(projectId, mrIid);
+});
+
 ipcMain.handle('get-review-context',  (_e, mrId: number) => getReviewContext(mrId));
 ipcMain.handle('save-review-context', (_e, mrId: number, text: string) => saveReviewContext(mrId, text));
 

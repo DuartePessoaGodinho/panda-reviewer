@@ -47,6 +47,7 @@ export const useMrsStore = defineStore('mrs', () => {
   const aiDrawerOpen = ref(false);
   const currentUserId = ref<number | null>(null);
   const locallyApproved = ref(new Set<number>());
+  const locallyUnapproved = ref(new Set<number>());
   const repoCache = ref<Record<number, string | null>>({});
   const pinnedMrIds = ref(loadPinnedIds());
   const reviewCheckpoints = ref<Record<number, ReviewCheckpoint>>({});
@@ -62,10 +63,15 @@ export const useMrsStore = defineStore('mrs', () => {
   const unreadMyMrsCount = computed(() => myMrs.value.filter(mr => unreadActivityByMrId.value[mr.id]).length);
   const unreadPinnedCount = computed(() => pinnedMrs.value.filter(mr => unreadActivityByMrId.value[mr.id]).length);
 
-  function approvedByMe(mr: MR): boolean {
-    if (locallyApproved.value.has(mr.id)) return true;
+  function serverApprovedByMe(mr: MR): boolean {
     if (!currentUserId.value || !Array.isArray(mr.approved_by)) return false;
     return mr.approved_by.some(a => a.user?.id === currentUserId.value);
+  }
+
+  function approvedByMe(mr: MR): boolean {
+    if (locallyUnapproved.value.has(mr.id)) return false;
+    if (locallyApproved.value.has(mr.id)) return true;
+    return serverApprovedByMe(mr);
   }
 
   function findById(id: number): MR | null {
@@ -73,7 +79,13 @@ export const useMrsStore = defineStore('mrs', () => {
   }
 
   function markApproved(mrId: number) {
+    locallyUnapproved.value.delete(mrId);
     locallyApproved.value.add(mrId);
+  }
+
+  function markUnapproved(mrId: number) {
+    locallyApproved.value.delete(mrId);
+    locallyUnapproved.value.add(mrId);
   }
 
   async function loadReviewCheckpoint(mrId: number): Promise<ReviewCheckpoint | null> {
@@ -147,10 +159,29 @@ export const useMrsStore = defineStore('mrs', () => {
     saveUnreadActivity(next);
   }
 
+  function reconcileLocalApprovalOverrides() {
+    const openMrIds = new Set(allMrs.value.map(mr => mr.id));
+    for (const mrId of [...locallyApproved.value]) {
+      const mr = findById(mrId);
+      if (!mr || serverApprovedByMe(mr)) locallyApproved.value.delete(mrId);
+    }
+    for (const mrId of [...locallyUnapproved.value]) {
+      const mr = findById(mrId);
+      if (!mr || !serverApprovedByMe(mr)) locallyUnapproved.value.delete(mrId);
+    }
+    for (const mrId of [...locallyApproved.value, ...locallyUnapproved.value]) {
+      if (!openMrIds.has(mrId)) {
+        locallyApproved.value.delete(mrId);
+        locallyUnapproved.value.delete(mrId);
+      }
+    }
+  }
+
   function update(data: MrsUpdatePayload) {
     toReviewMrs.value = data.toReview;
     myMrs.value = data.myMrs;
     if (data.currentUserId) currentUserId.value = data.currentUserId;
+    reconcileLocalApprovalOverrides();
     const openMrIds = new Set([...data.toReview, ...data.myMrs].map(mr => mr.id));
     mergeUnreadActivity(data.activityEvents, openMrIds);
     if (activeMr.value) {
@@ -174,6 +205,7 @@ export const useMrsStore = defineStore('mrs', () => {
     aiDrawerOpen,
     currentUserId,
     locallyApproved,
+    locallyUnapproved,
     repoCache,
     pinnedMrIds,
     reviewCheckpoints,
@@ -188,6 +220,7 @@ export const useMrsStore = defineStore('mrs', () => {
     approvedByMe,
     findById,
     markApproved,
+    markUnapproved,
     loadReviewCheckpoint,
     markCurrentHeadReviewed,
     isPinned,

@@ -47,13 +47,11 @@
             :is-active="mrs.activeMr?.id === mr.id"
             :approved="mrs.approvedByMe(mr)"
             :pinned="mrs.isPinned(mr)"
-            :has-repo="mrs.repoCache[mr.project_id] != null"
-            :ai-enabled="aiEnabled"
             :activity="mrs.unreadActivityByMrId[mr.id] ?? null"
             @open="onOpen"
-            @ai-review="onAiReview"
             @open-in-ide="onOpenInIde"
             @approve="onApprove"
+            @unapprove="onUnapprove"
             @toggle-pin="onTogglePin"
             @open-external="onOpenExternal"
           />
@@ -73,10 +71,8 @@ import { projectUrl } from '../utils';
 import FilterBar from './FilterBar.vue';
 import MrCard from './MrCard.vue';
 
-const props = defineProps<{ aiEnabled: boolean }>();
 const emit = defineEmits<{
   open: [mr: MR];
-  'ai-review': [mr: MR];
   'clone-needed': [url: string];
 }>();
 
@@ -132,12 +128,6 @@ function onOpen(mr: MR) {
   emit('open', mr);
 }
 
-function onAiReview(mr: MR) {
-  mrs.setActiveMr(mr);
-  mrs.setActivePanelTab('ai');
-  emit('ai-review', mr);
-}
-
 async function onOpenInIde(mr: MR) {
   const result = await window.api.openInIde(projectUrl(mr));
   if (!result.found) emit('clone-needed', result.cloneUrl ?? projectUrl(mr));
@@ -148,6 +138,15 @@ async function onApprove(mr: MR) {
     await window.api.approveMr(mr.project_id, mr.iid);
     mrs.markApproved(mr.id);
     await mrs.markCurrentHeadReviewed(mr, 'approve');
+  } catch {
+    // toast handled by parent
+  }
+}
+
+async function onUnapprove(mr: MR) {
+  try {
+    await window.api.unapproveMr(mr.project_id, mr.iid);
+    mrs.markUnapproved(mr.id);
   } catch {
     // toast handled by parent
   }
