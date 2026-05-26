@@ -4,11 +4,20 @@ const path = require('path');
 
 const projectDir = path.resolve(__dirname, '..');
 const productName = 'Panda Reviewer';
+const devProductName = `${productName} Dev`;
 const sourceExe = path.join(projectDir, 'node_modules', 'electron', 'dist', 'electron.exe');
-const devExe = path.join(projectDir, 'node_modules', 'electron', 'dist', `${productName} Dev.exe`);
+const devExe = path.join(projectDir, 'node_modules', 'electron', 'dist', `${devProductName}.exe`);
 const iconPath = path.join(projectDir, 'assets', 'icon.ico');
 const rceditPath = path.join(projectDir, 'node_modules', 'electron-winstaller', 'vendor', 'rcedit.exe');
 const mainPath = path.join(projectDir, 'dist', 'main', 'main.js');
+const staleElectronShortcut = path.join(
+  process.env.APPDATA ?? '',
+  'Microsoft',
+  'Windows',
+  'Start Menu',
+  'Programs',
+  'Electron.lnk'
+);
 
 function requireFile(file, label) {
   if (!existsSync(file)) {
@@ -19,7 +28,11 @@ function requireFile(file, label) {
 function needsRefresh() {
   if (!existsSync(devExe)) return true;
   const devTime = statSync(devExe).mtimeMs;
-  return statSync(sourceExe).mtimeMs > devTime || statSync(iconPath).mtimeMs > devTime;
+  return (
+    statSync(sourceExe).mtimeMs > devTime ||
+    statSync(iconPath).mtimeMs > devTime ||
+    statSync(__filename).mtimeMs > devTime
+  );
 }
 
 function prepareDevExecutable() {
@@ -39,22 +52,47 @@ function prepareDevExecutable() {
       iconPath,
       '--set-version-string',
       'FileDescription',
-      productName,
+      devProductName,
       '--set-version-string',
       'ProductName',
-      productName,
+      devProductName,
       '--set-version-string',
       'InternalName',
-      productName,
+      devProductName,
       '--set-version-string',
       'OriginalFilename',
-      `${productName} Dev.exe`,
+      `${devProductName}.exe`,
     ],
     { stdio: 'inherit' }
   );
 }
 
+function removeStaleElectronShortcut() {
+  if (!process.env.APPDATA || !existsSync(staleElectronShortcut)) return;
+
+  try {
+    const script = [
+      '$shortcut = $args[0]',
+      '$expected = $args[1]',
+      '$shell = New-Object -ComObject WScript.Shell',
+      '$link = $shell.CreateShortcut($shortcut)',
+      'if ([IO.Path]::GetFullPath($link.TargetPath) -eq [IO.Path]::GetFullPath($expected)) {',
+      '  Remove-Item -LiteralPath $shortcut -Force',
+      '}',
+    ].join('; ');
+
+    execFileSync(
+      'powershell.exe',
+      ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-Command', script, staleElectronShortcut, sourceExe],
+      { stdio: 'ignore' }
+    );
+  } catch {
+    // Best effort cleanup. Launching the app is more important than failing on a stale shortcut.
+  }
+}
+
 prepareDevExecutable();
+removeStaleElectronShortcut();
 
 const child = spawn(devExe, [mainPath], {
   cwd: projectDir,

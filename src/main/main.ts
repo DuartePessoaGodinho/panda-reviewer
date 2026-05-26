@@ -17,7 +17,9 @@ import { findLocalRepo, buildRepoCache } from './localRepo';
 import { openInIde } from './ide';
 import { AiReviewProvider, startAiReview, cancelAiReview, checkAiReviewCli, isReviewRunning } from './aiReview';
 
-const APP_ID = 'com.panda-reviewer.app';
+const APP_ID = process.env.PANDA_REVIEWER_DEV === '1'
+  ? 'com.panda-reviewer.dev'
+  : 'com.panda-reviewer.app';
 const PRODUCT_NAME = 'Panda Reviewer';
 const isWindows = process.platform === 'win32';
 const shouldCheckForUpdates = app.isPackaged && process.env.PANDA_REVIEWER_DEV !== '1';
