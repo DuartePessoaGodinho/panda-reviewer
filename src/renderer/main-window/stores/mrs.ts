@@ -39,6 +39,24 @@ function saveUnreadActivity(activity: Record<number, MrActivityEvent>) {
   localStorage.setItem(UNREAD_ACTIVITY_STORAGE_KEY, JSON.stringify(activity));
 }
 
+function sameMr(a: MR, b: MR): boolean {
+  return JSON.stringify(a) === JSON.stringify(b);
+}
+
+function reconcileMrsList(current: MR[], incoming: MR[]): MR[] {
+  const currentById = new Map(current.map(mr => [mr.id, mr]));
+  const next = incoming.map(mr => {
+    const existing = currentById.get(mr.id);
+    return existing && sameMr(existing, mr) ? existing : mr;
+  });
+
+  if (next.length === current.length && next.every((mr, index) => mr === current[index])) {
+    return current;
+  }
+
+  return next;
+}
+
 export const useMrsStore = defineStore('mrs', () => {
   const toReviewMrs = ref<MR[]>([]);
   const myMrs = ref<MR[]>([]);
@@ -178,8 +196,10 @@ export const useMrsStore = defineStore('mrs', () => {
   }
 
   function update(data: MrsUpdatePayload) {
-    toReviewMrs.value = data.toReview;
-    myMrs.value = data.myMrs;
+    const nextToReview = reconcileMrsList(toReviewMrs.value, data.toReview);
+    const nextMyMrs = reconcileMrsList(myMrs.value, data.myMrs);
+    if (nextToReview !== toReviewMrs.value) toReviewMrs.value = nextToReview;
+    if (nextMyMrs !== myMrs.value) myMrs.value = nextMyMrs;
     if (data.currentUserId) currentUserId.value = data.currentUserId;
     reconcileLocalApprovalOverrides();
     const openMrIds = new Set([...data.toReview, ...data.myMrs].map(mr => mr.id));

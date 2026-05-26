@@ -17,7 +17,13 @@ import { findLocalRepo, buildRepoCache } from './localRepo';
 import { openInIde } from './ide';
 import { AiReviewProvider, startAiReview, cancelAiReview, checkAiReviewCli, isReviewRunning } from './aiReview';
 
-app.setAppUserModelId('com.panda-reviewer.app');
+const APP_ID = 'com.panda-reviewer.app';
+const PRODUCT_NAME = 'Panda Reviewer';
+const isWindows = process.platform === 'win32';
+const shouldCheckForUpdates = app.isPackaged && process.env.PANDA_REVIEWER_DEV !== '1';
+
+app.setAppUserModelId(APP_ID);
+app.setName(PRODUCT_NAME);
 
 const hasSingleInstanceLock = app.requestSingleInstanceLock();
 
@@ -31,18 +37,27 @@ let mainWindow: BrowserWindow | null = null;
 let cachedToReview: MergeRequest[] = [];
 let cachedMyMrs: MergeRequest[] = [];
 
-function getIconPath(): string {
-  return path.join(__dirname, '../../assets/icon.png');
+function getAssetPath(fileName: string): string {
+  return path.join(__dirname, '../../assets', fileName);
+}
+
+function getWindowIconPath(): string {
+  return getAssetPath(isWindows ? 'icon.ico' : 'icon.png');
+}
+
+function getTrayIconPath(): string {
+  return getAssetPath('icon.png');
 }
 
 function createMainWindow(): BrowserWindow {
+  const windowIcon = nativeImage.createFromPath(getWindowIconPath());
   const win = new BrowserWindow({
     width: 1200,
     height: 820,
     minWidth: 720,
     minHeight: 500,
     frame: false,
-    icon: getIconPath(),
+    icon: windowIcon,
     backgroundColor: '#FFFFFF',
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
@@ -51,6 +66,10 @@ function createMainWindow(): BrowserWindow {
     },
     show: false,
   });
+
+  if (isWindows && !windowIcon.isEmpty()) {
+    win.setIcon(windowIcon);
+  }
 
   win.loadFile(path.join(__dirname, '../renderer/main-window/index.html'));
 
@@ -94,9 +113,9 @@ app.on('second-instance', () => {
 });
 
 function setupTray(): void {
-  const icon = nativeImage.createFromPath(getIconPath()).resize({ width: 16, height: 16 });
+  const icon = nativeImage.createFromPath(getTrayIconPath()).resize({ width: 16, height: 16 });
   tray = new Tray(icon);
-  tray.setToolTip('Panda Reviewer');
+  tray.setToolTip(PRODUCT_NAME);
 
   const contextMenu = Menu.buildFromTemplate([
     { label: 'Open', click: openMain },
@@ -311,7 +330,12 @@ app.whenReady().then(() => {
   pruneOldReviewContexts();
   pruneOldReviewHistory();
   setupTray();
-  autoUpdater.checkForUpdatesAndNotify();
+
+  if (shouldCheckForUpdates) {
+    autoUpdater.checkForUpdatesAndNotify().catch((err) => {
+      console.warn('[updates] check failed:', err);
+    });
+  }
 
   if (!isConfigured()) {
     openSettings();

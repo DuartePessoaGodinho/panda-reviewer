@@ -8,6 +8,7 @@ interface CommentsState {
   posting: boolean;
   error: string;
   version: MergeRequestVersion | null;
+  loaded: boolean;
 }
 
 function keyFor(projectId: number, mrIid: number): string {
@@ -21,7 +22,12 @@ function emptyState(): CommentsState {
     posting: false,
     error: '',
     version: null,
+    loaded: false,
   };
+}
+
+function sameDiscussions(a: GitLabDiscussion[], b: GitLabDiscussion[]): boolean {
+  return JSON.stringify(a) === JSON.stringify(b);
 }
 
 export const useCommentsStore = defineStore('comments', () => {
@@ -40,18 +46,23 @@ export const useCommentsStore = defineStore('comments', () => {
 
   async function load(mr: MR, force = false): Promise<GitLabDiscussion[]> {
     const state = stateFor(mr.project_id, mr.iid);
-    if (!force && state.discussions.length > 0) return state.discussions;
+    if (!force && state.loaded) return state.discussions;
 
-    state.loading = true;
+    const showLoading = !state.loaded;
+    if (showLoading) state.loading = true;
     state.error = '';
     try {
-      state.discussions = await window.api.getMrDiscussions(mr.project_id, mr.iid);
+      const discussions = await window.api.getMrDiscussions(mr.project_id, mr.iid);
+      if (!sameDiscussions(state.discussions, discussions)) {
+        state.discussions = discussions;
+      }
+      state.loaded = true;
       return state.discussions;
     } catch (err) {
       state.error = err instanceof Error ? err.message : String(err);
       throw err;
     } finally {
-      state.loading = false;
+      if (showLoading) state.loading = false;
     }
   }
 

@@ -245,28 +245,30 @@
                 v-html="diffHtml"
               ></div>
             </div>
-            <div
-              v-if="inlineDraft"
-              class="inline-comment-popover"
-              :style="{ top: `${inlineDraft.top}px`, left: `${inlineDraft.left}px` }"
-            >
-              <div class="inline-comment-title">
-                <span class="inline-comment-title-label">{{ inlineDraft.label }}</span>
-                <button type="button" @click="cancelInlineDraft">×</button>
+            <Teleport to="body">
+              <div
+                v-if="inlineDraft"
+                class="inline-comment-popover"
+                :style="{ top: `${inlineDraft.top}px`, left: `${inlineDraft.left}px` }"
+              >
+                <div class="inline-comment-title">
+                  <span class="inline-comment-title-label">{{ inlineDraft.label }}</span>
+                  <button type="button" @click="cancelInlineDraft">×</button>
+                </div>
+                <textarea
+                  v-model="inlineBody"
+                  class="inline-comment-textarea"
+                  placeholder="Add an inline comment..."
+                  :disabled="commentState.posting"
+                ></textarea>
+                <div class="inline-comment-actions">
+                  <span class="comment-error">{{ inlineError || commentState.error }}</span>
+                  <button class="inline-comment-submit" :disabled="commentState.posting || !inlineBody.trim()" @click="submitInlineComment">
+                    {{ commentState.posting ? 'Posting...' : 'Comment' }}
+                  </button>
+                </div>
               </div>
-              <textarea
-                v-model="inlineBody"
-                class="inline-comment-textarea"
-                placeholder="Add an inline comment..."
-                :disabled="commentState.posting"
-              ></textarea>
-              <div class="inline-comment-actions">
-                <span class="comment-error">{{ inlineError || commentState.error }}</span>
-                <button class="inline-comment-submit" :disabled="commentState.posting || !inlineBody.trim()" @click="submitInlineComment">
-                  {{ commentState.posting ? 'Posting...' : 'Comment' }}
-                </button>
-              </div>
-            </div>
+            </Teleport>
           </template>
         </div>
 
@@ -332,7 +334,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import type { CSSProperties } from 'vue';
 import { useMrsStore } from '../stores/mrs';
 import { useCommentsStore } from '../stores/comments';
@@ -355,6 +357,10 @@ const AI_DRAWER_DEFAULT_WIDTH = 440;
 const DIFF_TREE_MIN_WIDTH = 260;
 const DIFF_TREE_MAX_WIDTH = 640;
 const DIFF_TREE_DEFAULT_WIDTH = 420;
+const INLINE_COMMENT_POPOVER_WIDTH = 460;
+const INLINE_COMMENT_POPOVER_ESTIMATED_HEIGHT = 210;
+const INLINE_COMMENT_POPOVER_MARGIN = 14;
+const INLINE_COMMENT_ROW_GAP = 6;
 
 const mrs = useMrsStore();
 const loadingDiff = ref(false);
@@ -400,6 +406,15 @@ type DiffLinePosition = {
   new_line?: number;
   kind: 'old' | 'new' | 'context';
   content: string;
+};
+type DiffViewSnapshot = {
+  rootTop: number;
+  rootLeft: number;
+  treeTop?: number;
+  treeLeft?: number;
+  bodyTop?: number;
+  bodyLeft?: number;
+  collapsedFiles: Set<string>;
 };
 const changedLines = computed(() => diffStats.value.added + diffStats.value.deleted);
 const currentSha = computed(() => mrs.activeMr?.sha ?? '');
@@ -1375,14 +1390,84 @@ function parseDiffStats(diff: string) {
   };
 }
 
-function renderDiff(diff: string, changes = currentChanges.value) {
+function diffFileName(file: Element): string {
+  return file.querySelector('.d2h-file-name')?.textContent?.trim() ?? '';
+}
+
+function captureDiffView(): DiffViewSnapshot | null {
+  const root = diffContentRef.value;
+  if (!root) return null;
+
+  const treePane = root.querySelector<HTMLElement>('.diff-tree-pane');
+  const bodyPane = root.querySelector<HTMLElement>('.diff-body-pane');
+  const collapsedFiles = new Set(
+    [...root.querySelectorAll('.d2h-file-wrapper.d2h-file-collapsed')]
+      .map(diffFileName)
+      .filter(Boolean)
+  );
+
+  return {
+    rootTop: root.scrollTop,
+    rootLeft: root.scrollLeft,
+    treeTop: treePane?.scrollTop,
+    treeLeft: treePane?.scrollLeft,
+    bodyTop: bodyPane?.scrollTop,
+    bodyLeft: bodyPane?.scrollLeft,
+    collapsedFiles,
+  };
+}
+
+function restoreElementScroll(element: HTMLElement | null, top?: number, left?: number) {
+  if (!element) return;
+  if (typeof top === 'number') {
+    element.scrollTop = Math.min(top, Math.max(0, element.scrollHeight - element.clientHeight));
+  }
+  if (typeof left === 'number') {
+    element.scrollLeft = Math.min(left, Math.max(0, element.scrollWidth - element.clientWidth));
+  }
+}
+
+async function restoreDiffView(snapshot: DiffViewSnapshot) {
+  await nextTick();
+  const root = diffContentRef.value;
+  if (!root) return;
+
+  restoreElementScroll(root, snapshot.rootTop, snapshot.rootLeft);
+  restoreElementScroll(root.querySelector<HTMLElement>('.diff-tree-pane'), snapshot.treeTop, snapshot.treeLeft);
+  restoreElementScroll(root.querySelector<HTMLElement>('.diff-body-pane'), snapshot.bodyTop, snapshot.bodyLeft);
+}
+
+function applyCollapsedDiffFiles(html: string, collapsedFiles: Set<string>) {
+  if (collapsedFiles.size === 0) return html;
+
+  const doc = new DOMParser().parseFromString(`<div>${html}</div>`, 'text/html');
+  doc.querySelectorAll('.d2h-file-wrapper').forEach((file) => {
+    if (!collapsedFiles.has(diffFileName(file))) return;
+
+    file.classList.add('d2h-file-collapsed');
+    file.querySelector('.d2h-file-diff')?.classList.add('d2h-d-none');
+    const toggle = file.querySelector('.d2h-file-toggle');
+    toggle?.setAttribute('aria-expanded', 'false');
+    toggle?.setAttribute('aria-label', 'Expand file diff');
+    toggle?.setAttribute('title', 'Expand file diff');
+    file.querySelector('.d2h-file-path-toggle')?.setAttribute('title', 'Expand file diff');
+  });
+
+  return doc.body.firstElementChild?.innerHTML ?? html;
+}
+
+function renderDiff(diff: string, changes = currentChanges.value, options: { preserveView?: boolean } = {}) {
+  const viewSnapshot = options.preserveView ? captureDiffView() : null;
   diffStats.value = parseDiffStats(diff);
   const html = makeDiffFilesCollapsible(Diff2Html.html(diff, {
     drawFileList: true,
     outputFormat: 'line-by-line',
     renderNothingWhenEmpty: false,
   }), fileListView.value);
-  const decoratedHtml = decorateDiffHtml(html, changes, commentState.value.discussions);
+  const decoratedHtml = applyCollapsedDiffFiles(
+    decorateDiffHtml(html, changes, commentState.value.discussions),
+    viewSnapshot?.collapsedFiles ?? new Set()
+  );
   diffHtml.value = decoratedHtml;
 
   if (fileListView.value === 'tree') {
@@ -1394,6 +1479,8 @@ function renderDiff(diff: string, changes = currentChanges.value) {
     diffTreeHtml.value = '';
     diffBodyHtml.value = '';
   }
+
+  if (viewSnapshot) void restoreDiffView(viewSnapshot);
 }
 
 function fullDiffFromChanges(changes: any[]) {
@@ -1497,19 +1584,33 @@ function handleDiffContentKeydown(event: KeyboardEvent) {
 function openInlineDraft(row: HTMLElement) {
   inlineError.value = '';
 
-  const wrapRect = row.closest('.diff-content-wrap')?.getBoundingClientRect();
   const rowRect = row.getBoundingClientRect();
   const oldLine = row.dataset.oldLine ? Number(row.dataset.oldLine) : undefined;
   const newLine = row.dataset.newLine ? Number(row.dataset.newLine) : undefined;
   const path = row.dataset.newPath || row.dataset.oldPath || '';
   const lineLabel = newLine ?? oldLine;
+  const availablePopoverWidth = Math.max(0, window.innerWidth - INLINE_COMMENT_POPOVER_MARGIN * 2);
+  const popoverWidth = Math.min(
+    INLINE_COMMENT_POPOVER_WIDTH,
+    availablePopoverWidth
+  );
+  const maxLeft = Math.max(
+    INLINE_COMMENT_POPOVER_MARGIN,
+    window.innerWidth - popoverWidth - INLINE_COMMENT_POPOVER_MARGIN
+  );
+  const left = Math.min(
+    maxLeft,
+    Math.max(INLINE_COMMENT_POPOVER_MARGIN, rowRect.left + 68)
+  );
+  const topBelow = rowRect.bottom + INLINE_COMMENT_ROW_GAP;
+  const topAbove = rowRect.top - INLINE_COMMENT_POPOVER_ESTIMATED_HEIGHT - INLINE_COMMENT_ROW_GAP;
+  const top = topBelow + INLINE_COMMENT_POPOVER_ESTIMATED_HEIGHT <= window.innerHeight - INLINE_COMMENT_POPOVER_MARGIN
+    ? topBelow
+    : Math.max(INLINE_COMMENT_POPOVER_MARGIN, topAbove);
 
   inlineDraft.value = {
-    top: Math.min(
-      Math.max(58, rowRect.bottom - (wrapRect?.top ?? 0) + 6),
-      Math.max(72, (wrapRect?.height ?? 520) - 210)
-    ),
-    left: Math.min(92, Math.max(14, rowRect.left - (wrapRect?.left ?? 0) + 68)),
+    top,
+    left,
     label: `${path}${lineLabel ? `:${lineLabel}` : ''}`,
     old_path: row.dataset.oldPath ?? path,
     new_path: row.dataset.newPath ?? path,
@@ -1539,7 +1640,7 @@ async function submitInlineComment() {
       new_line: draft.new_line,
     }, body);
     cancelInlineDraft();
-    renderDiff(currentCombinedDiff.value);
+    renderDiff(currentCombinedDiff.value, currentChanges.value, { preserveView: true });
   } catch {
     inlineError.value = 'Could not post inline comment. Refresh the diff and try again.';
   }
@@ -1556,7 +1657,11 @@ async function loadAiHistoryNotice(mrId: number) {
 }
 
 watch(
-  () => [mrs.activeMr?.id, mrs.activeMr?.sha, shouldShowDiff.value] as const,
+  [
+    () => mrs.activeMr?.id,
+    () => mrs.activeMr?.sha,
+    () => shouldShowDiff.value,
+  ],
   async ([mrId, _sha, canShowDiff]) => {
     if (!mrId || !canShowDiff) return;
     await loadCheckpoint(mrId);
@@ -1578,7 +1683,7 @@ watch(
     localStorage.setItem(FILE_LIST_VIEW_STORAGE_KEY, view);
     if (view === 'tree') diffTreeWidth.value = clampDiffTreeWidth(diffTreeWidth.value);
     if (currentCombinedDiff.value && shouldShowDiff.value) {
-      renderDiff(currentCombinedDiff.value);
+      renderDiff(currentCombinedDiff.value, currentChanges.value, { preserveView: true });
     }
   }
 );
@@ -1591,7 +1696,10 @@ watch(
 );
 
 watch(
-  () => [mrs.aiDrawerOpen, isCompact.value] as const,
+  [
+    () => mrs.aiDrawerOpen,
+    () => isCompact.value,
+  ],
   ([drawerOpen, compact]) => {
     if (compact && drawerOpen) mrs.setActivePanelTab('ai');
     if (!compact && mrs.activePanelTab === 'ai') mrs.setActivePanelTab('diff');
@@ -1616,7 +1724,7 @@ watch(
   () => commentState.value.discussions,
   () => {
     if (currentCombinedDiff.value && shouldShowDiff.value) {
-      renderDiff(currentCombinedDiff.value);
+      renderDiff(currentCombinedDiff.value, currentChanges.value, { preserveView: true });
     }
   },
   { deep: true }
@@ -2582,9 +2690,9 @@ onBeforeUnmount(() => {
 }
 
 .inline-comment-popover {
-  position: absolute;
+  position: fixed;
   z-index: 20;
-  width: min(460px, calc(100% - 112px));
+  width: min(460px, calc(100vw - 28px));
   border: 1px solid var(--accent-border);
   border-radius: 10px;
   background:

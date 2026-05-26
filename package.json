@@ -8,9 +8,9 @@
     "build:renderer": "vue-tsc -p tsconfig.vue.json --noEmit && vite build",
     "build": "npm run build:main && npm run build:renderer",
     "dev:renderer": "vite",
-    "dev": "npm run build:main && concurrently \"vite\" \"electron dist/main/main.js\"",
+    "dev": "npm run build:main && concurrently \"vite\" \"node scripts/start-electron-dev.cjs\"",
     "icons": "powershell -ExecutionPolicy Bypass -File scripts/generate-icons.ps1",
-    "start": "npm run build && electron dist/main/main.js",
+    "start": "npm run build && node scripts/start-electron-dev.cjs",
     "dist": "npm run build && electron-builder",
     "publish": "npm run build && electron-builder --publish always"
   },
@@ -18,8 +18,8 @@
     "@types/node": "^20.0.0",
     "@vitejs/plugin-vue": "^6.0.6",
     "concurrently": "^8.0.0",
-    "electron": "^31.0.0",
-    "electron-builder": "^24.0.0",
+    "electron": "^42.2.0",
+    "electron-builder": "^26.8.1",
     "typescript": "^5.4.0",
     "vite": "^8.0.11",
     "vue-tsc": "^3.2.8"
@@ -35,6 +35,7 @@
   "build": {
     "appId": "com.panda-reviewer.app",
     "productName": "Panda Reviewer",
+    "afterPack": "scripts/patch-win-resources.cjs",
     "publish": {
       "provider": "github",
       "owner": "DuartePessoaGodinho",
@@ -55,7 +56,8 @@
           ]
         }
       ],
-      "icon": "assets/icon.ico"
+      "icon": "assets/icon.ico",
+      "signAndEditExecutable": false
     },
     "nsis": {
       "oneClick": false,
